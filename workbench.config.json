@@ -1,0 +1,32 @@
+{
+  "colors": ["blue", "green", "red", "yellow", "black", "purple", "orange", "cyan"],
+  "port": 3232,
+  "launchers": [
+    {
+      "id": "ghostty",
+      "label": "Ghostty",
+      "icon": "terminal",
+      "type": "tmux-terminal",
+      "app": "/Applications/Ghostty.app/Contents/MacOS/ghostty",
+      "fullscreen": true,
+      "panes": [
+        { "cmd": "claude --continue", "focus": true },
+        { "cmd": null }
+      ]
+    },
+    {
+      "id": "zed",
+      "label": "Zed",
+      "icon": "editor",
+      "type": "command",
+      "cmd": "zed \"{{path}}\""
+    },
+    {
+      "id": "vscode",
+      "label": "VS Code",
+      "icon": "editor",
+      "type": "command",
+      "cmd": "code \"{{path}}\""
+    }
+  ]
+}

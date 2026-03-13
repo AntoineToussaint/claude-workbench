@@ -1,0 +1,27 @@
+{
+  "name": "claude-workbench",
+  "version": "0.1.0",
+  "description": "Parallel Claude Code workbench — color-coded worktrees, tmux, one-click terminal/editor launch",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "start": "node server.js",
+    "start:reset": "node server.js --reset",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "better-sqlite3": "^12.6.2",
+    "express": "^4.21.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.4.1",
+    "vite": "^6.4.1",
+    "vitest": "^4.1.0"
+  }
+}
