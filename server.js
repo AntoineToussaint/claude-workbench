@@ -1,7 +1,7 @@
 import express from "express";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { loadConfig, COLORS } from "./lib/config.js";
+import { loadConfig, saveConfig, COLORS } from "./lib/config.js";
 import { listRepos, getSetting, setSetting } from "./db.js";
 import repoRoutes from "./routes/repos.js";
 import envRoutes from "./routes/environments.js";
@@ -15,7 +15,7 @@ delete process.env.CLAUDECODE;
 delete process.env.ANTHROPIC_API_KEY;
 
 // Ensure homebrew binaries are available (macOS only)
-import { getHomebrewPrefix, commandExists } from "./lib/platform.js";
+import { getHomebrewPrefix, commandExists, detectPlatform, generateDefaultConfig } from "./lib/platform.js";
 const brewPrefix = getHomebrewPrefix();
 if (brewPrefix) {
   process.env.PATH = `${brewPrefix}:${process.env.PATH}`;
@@ -38,11 +38,44 @@ app.use(express.json());
 
 app.get("/api/config", (_req, res) => {
   const config = loadConfig();
+  if (!config) return res.json({ setupRequired: true });
+
   const colors = (config.colors ?? Object.keys(COLORS)).map((name) => ({
     name,
     ...(COLORS[name] ?? { hex: "#888", bg: "#111" }),
   }));
-  res.json({ ...config, colors, repos: listRepos() });
+  res.json({ ...config, colors, repos: listRepos(), missingDeps });
+});
+
+// ── Setup wizard ────────────────────────────────────────────────────────────
+
+app.get("/api/setup/detect", (_req, res) => {
+  const platform = detectPlatform();
+  const defaults = generateDefaultConfig(platform);
+  res.json({
+    platform,
+    defaults,
+    allColors: Object.keys(COLORS),
+    missingDeps,
+  });
+});
+
+app.post("/api/setup", (req, res) => {
+  const { colors, port, launchers } = req.body;
+  const config = {
+    colors: colors ?? Object.keys(COLORS),
+    port: port ?? 3232,
+    launchers: launchers ?? [],
+  };
+  saveConfig(config);
+  res.json({ ok: true });
+});
+
+app.put("/api/config", (req, res) => {
+  const current = loadConfig() ?? {};
+  const updated = { ...current, ...req.body };
+  saveConfig(updated);
+  res.json({ ok: true });
 });
 
 // ── Layout order persistence ────────────────────────────────────────────────
@@ -81,7 +114,7 @@ export { app, loadConfig, COLORS };
 const isMainModule = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/^\//, ""));
 if (isMainModule || !process.env.VITEST) {
   const config = loadConfig();
-  const port = config.port ?? 3131;
+  const port = config?.port ?? 3232;
   app.listen(port, () => {
     console.log(`Claude Workbench running on http://localhost:${port}`);
   });
