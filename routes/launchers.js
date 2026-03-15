@@ -153,7 +153,7 @@ function launchTmuxTerminal(launcher, color, envPath, colorDef, title, res) {
     const lastPane = panes.length - 1;
     let paneOffset = 0;
     const config = loadConfig();
-    const port = config.port ?? 3131;
+    const port = config?.port ?? 3232;
     const objectiveCmd = `while clear && curl -s http://localhost:${port}/api/environments/${color}/objective 2>/dev/null; do sleep 5; done`;
     cmds.push(`tmux split-window -v -b -t ${session}:.${lastPane} -c "${envPath}" -l 20% '${objectiveCmd}'`);
     paneOffset = 1;

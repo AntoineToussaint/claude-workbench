@@ -25,7 +25,7 @@ if (!existsSync(distDir)) {
 
 // Start the server
 const config = loadConfig();
-const port = config.port ?? 3232;
+const port = config?.port ?? 3232;
 const url = `http://localhost:${port}`;
 
 console.log(`Starting Claude Workbench on ${url}`);

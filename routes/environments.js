@@ -105,8 +105,10 @@ router.get("/environments/:color/objective", (req, res) => {
   const env = getEnvironment(color);
   if (!env) return res.type("text").send("No environment assigned");
 
-  const colorDef = COLORS[color] ?? { hex: "#888" };
-  const [r, g, b] = colorDef.hex.match(/\w{2}/g).map((h) => parseInt(h, 16));
+  const colorDef = COLORS[color] ?? { hex: "#888888" };
+  const rawMatches = colorDef.hex.replace("#", "").match(/\w{2}/g);
+  const hexMatches = rawMatches?.length === 3 ? rawMatches : ["88", "88", "88"];
+  const [r, g, b] = hexMatches.map((h) => parseInt(h, 16));
   const c = (text) => `\x1b[38;2;${r};${g};${b}m${text}\x1b[0m`;
   const dim = (text) => `\x1b[2m${text}\x1b[0m`;
   const bold = (text) => `\x1b[1m${text}\x1b[0m`;

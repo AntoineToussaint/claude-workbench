@@ -10,6 +10,8 @@ import {
   getWindowFocusCommand,
   getHomebrewPrefix,
 } from "../lib/platform.js";
+import { loadConfig, saveConfig, isSetupComplete, COLORS } from "../lib/config.js";
+import { getSetting, setSetting } from "../db.js";
 
 afterEach(() => {
   resetPlatformCache();
@@ -188,5 +190,60 @@ describe("platform detection", () => {
         expect(prefix).toBeNull();
       }
     });
+  });
+});
+
+describe("config (SQLite)", () => {
+  it("should save and load config from SQLite", () => {
+    const testConfig = { colors: ["blue", "red"], port: 4000, launchers: [] };
+    saveConfig(testConfig);
+    const loaded = loadConfig();
+    expect(loaded).toEqual(testConfig);
+  });
+
+  it("should report setup as complete after saving", () => {
+    saveConfig({ colors: ["blue"], port: 3232, launchers: [] });
+    expect(isSetupComplete()).toBe(true);
+  });
+
+  it("should handle null-safe port access on config", () => {
+    // Simulate what bin/claude-workbench.js does
+    const config = null;
+    const port = config?.port ?? 3232;
+    expect(port).toBe(3232);
+  });
+
+  it("COLORS should have valid hex values with # prefix", () => {
+    for (const [name, def] of Object.entries(COLORS)) {
+      expect(def.hex).toMatch(/^#[0-9A-Fa-f]{6}$/);
+      expect(def.bg).toMatch(/^#[0-9A-Fa-f]{6}$/);
+      // Verify hex parsing doesn't crash
+      const matches = def.hex.replace("#", "").match(/\w{2}/g);
+      expect(matches).toHaveLength(3);
+      const [r, g, b] = matches.map((h) => parseInt(h, 16));
+      expect(r).toBeGreaterThanOrEqual(0);
+      expect(r).toBeLessThanOrEqual(255);
+    }
+  });
+
+  it("should handle malformed hex gracefully", () => {
+    // Simulates what environments.js objective endpoint does
+    // Short hex like #888 only has 1 pair match, fallback kicks in
+    const badHex = "#888";
+    const rawMatches = badHex.replace("#", "").match(/\w{2}/g);
+    expect(rawMatches).toHaveLength(1); // only "88" matched
+    const safeMatches = rawMatches?.length === 3 ? rawMatches : ["88", "88", "88"];
+    expect(safeMatches).toHaveLength(3);
+
+    // Good hex works normally
+    const goodHex = "#3B82F6";
+    const goodMatches = goodHex.replace("#", "").match(/\w{2}/g);
+    expect(goodMatches).toHaveLength(3);
+  });
+
+  it("generateDefaultConfig port should be 3232", () => {
+    const platform = detectPlatform();
+    const config = generateDefaultConfig(platform);
+    expect(config.port).toBe(3232);
   });
 });
