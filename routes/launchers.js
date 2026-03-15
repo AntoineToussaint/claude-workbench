@@ -4,7 +4,7 @@ import { writeFileSync } from "fs";
 import { basename, join } from "path";
 import { getRepoById, getEnvironment } from "../db.js";
 import { loadConfig, COLORS } from "../lib/config.js";
-import { detectPlatform, getTerminalSpawnArgs, getWindowFocusCommand, getClipboardCommand } from "../lib/platform.js";
+import { detectPlatform, getTerminalSpawnArgs, getWindowFocusCommand, getClipboardCommand, commandExists } from "../lib/platform.js";
 
 const router = Router();
 const terminalPids = {};
@@ -40,6 +40,7 @@ function interpolate(template, vars) {
 // ── Kill all sessions ───────────────────────────────────────────────────────
 
 router.post("/kill-sessions", (_req, res) => {
+  if (!commandExists("tmux")) return res.json({ ok: true, killed: 0 });
   exec(`tmux list-sessions -F "#{session_name}" 2>/dev/null`, (_err, out) => {
     const sessions = (out ?? "").split("\n").filter((s) => s.startsWith("wb-"));
     if (sessions.length === 0) return res.json({ ok: true, killed: 0 });
@@ -72,6 +73,10 @@ router.post("/launch", (req, res) => {
       res.json({ ok: true });
     });
   } else if (launcher.type === "tmux-terminal") {
+    if (!commandExists("tmux")) {
+      const hint = process.platform === "darwin" ? "brew install tmux" : "apt install tmux";
+      return res.status(500).json({ error: `tmux is not installed. Run: ${hint}` });
+    }
     launchTmuxTerminal(launcher, color, envPath, colorDef, title, res);
   } else {
     res.status(400).json({ error: `Unknown launcher type: ${launcher.type}` });

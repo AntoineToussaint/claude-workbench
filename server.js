@@ -15,10 +15,20 @@ delete process.env.CLAUDECODE;
 delete process.env.ANTHROPIC_API_KEY;
 
 // Ensure homebrew binaries are available (macOS only)
-import { getHomebrewPrefix } from "./lib/platform.js";
+import { getHomebrewPrefix, commandExists } from "./lib/platform.js";
 const brewPrefix = getHomebrewPrefix();
 if (brewPrefix) {
   process.env.PATH = `${brewPrefix}:${process.env.PATH}`;
+}
+
+// Check required dependencies on startup
+const missingDeps = [];
+if (!commandExists("tmux")) missingDeps.push("tmux");
+if (!commandExists("gh")) missingDeps.push("gh (GitHub CLI)");
+if (missingDeps.length > 0) {
+  const installHint = process.platform === "darwin" ? `brew install ${missingDeps.map(d => d.split(" ")[0]).join(" ")}` : `apt install ${missingDeps.map(d => d.split(" ")[0]).join(" ")}`;
+  console.warn(`\n⚠  Missing dependencies: ${missingDeps.join(", ")}`);
+  console.warn(`   Install with: ${installHint}\n`);
 }
 
 const app = express();
