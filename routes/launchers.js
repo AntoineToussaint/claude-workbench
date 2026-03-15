@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { exec, spawn } from "child_process";
 import { writeFileSync } from "fs";
-import { basename } from "path";
+import { basename, join } from "path";
 import { getRepoById, getEnvironment } from "../db.js";
 import { loadConfig, COLORS } from "../lib/config.js";
+import { detectPlatform, getTerminalSpawnArgs, getWindowFocusCommand, getClipboardCommand } from "../lib/platform.js";
 
 const router = Router();
 const terminalPids = {};
@@ -20,10 +21,11 @@ export function tmuxSession(launcherId, color) { return `wb-${launcherId}-${colo
 
 function resolveEnvPath(color) {
   const env = getEnvironment(color);
-  if (env?.path) return env.path;
-  const repo = getRepoById(env?.repoId);
-  const repoName = basename(repo?.repoDir ?? "workbench");
-  return join(repo?.workDir ?? "/tmp", `${repoName}-${color}`);
+  if (!env) throw new Error(`No environment assigned to ${color}`);
+  if (env.path) return env.path;
+  const repo = getRepoById(env.repoId);
+  if (!repo) throw new Error(`Repo not found: ${env.repoId}`);
+  return join(repo.workDir, `${basename(repo.repoDir)}-${color}`);
 }
 
 function resolveTitle(color) {
@@ -55,7 +57,10 @@ router.post("/launch", (req, res) => {
   const launcher = (config.launchers ?? []).find((l) => l.id === launcherId);
   if (!launcher) return res.status(400).json({ error: `Unknown launcher: ${launcherId}` });
 
-  const envPath = resolveEnvPath(color);
+  let envPath;
+  try { envPath = resolveEnvPath(color); } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
   const colorDef = COLORS[color] ?? { hex: "#888", bg: "#111" };
   const title = resolveTitle(color);
   const env = getEnvironment(color);
@@ -79,7 +84,8 @@ function launchTmuxTerminal(launcher, color, envPath, colorDef, title, res) {
 
   if (isAlive(key)) {
     const pid = terminalPids[key];
-    exec(`osascript -e 'tell application "System Events" to set frontmost of (first process whose unix id is ${pid}) to true'`);
+    const focusCmd = getWindowFocusCommand(pid);
+    if (focusCmd) exec(focusCmd);
     return res.json({ ok: true, reused: true });
   }
 
@@ -109,9 +115,19 @@ function launchTmuxTerminal(launcher, color, envPath, colorDef, title, res) {
       `tmux set-option -t ${session} mouse on`,
       `tmux set-option -t ${session} set-clipboard on`,
       `tmux set-option -t ${session} allow-passthrough on`,
-      `tmux set-option -t ${session} copy-command 'pbcopy'`,
-      `tmux bind-key -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel 'pbcopy'`,
-      `tmux bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel 'pbcopy'`,
+    );
+
+    // Clipboard integration (platform-aware)
+    const clipCmd = getClipboardCommand();
+    if (clipCmd) {
+      cmds.push(
+        `tmux set-option -t ${session} copy-command '${clipCmd}'`,
+        `tmux bind-key -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel '${clipCmd}'`,
+        `tmux bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel '${clipCmd}'`,
+      );
+    }
+
+    cmds.push(
       `tmux set-option -t ${session} status-style "bg=${colorDef.hex},fg=#000000"`,
       `tmux set-option -t ${session} status-left " ■ ${color.toUpperCase()} │ ${title} "`,
       `tmux set-option -t ${session} status-left-length 120`,
@@ -153,32 +169,42 @@ function launchTmuxTerminal(launcher, color, envPath, colorDef, title, res) {
 
 function spawnTerminalApp(launcher, session, color, colorDef, title) {
   const key = pidKey(launcher.id, color);
-  const appPath = launcher.app;
+  const platform = detectPlatform();
 
-  if (appPath.includes("ghostty") || appPath.includes("Ghostty")) {
-    const configPath = `/tmp/wb-${launcher.id}-${color}.conf`;
-    const lines = [
-      `command = /bin/zsh -c "exec tmux attach -t ${session}"`,
-      `background = ${colorDef.bg}`,
-      `title = ${title}`,
-      `window-save-state = never`,
-      `confirm-close-surface = false`,
-      `keybind = super+n=new_window`,
-    ];
-    if (launcher.fullscreen) {
-      lines.push(`fullscreen = true`, `macos-non-native-fullscreen = true`);
-    }
-    writeFileSync(configPath, lines.join("\n") + "\n");
+  // Determine terminal name from the app path or launcher id
+  let terminalName = launcher.id;
+  const appPath = (launcher.app ?? "").toLowerCase();
+  if (appPath.includes("ghostty")) terminalName = "ghostty";
+  else if (appPath.includes("kitty")) terminalName = "kitty";
+  else if (appPath.includes("alacritty")) terminalName = "alacritty";
+  else if (appPath.includes("iterm")) terminalName = "iterm2";
+  else if (appPath.includes("terminal.app")) terminalName = "terminal.app";
+  else if (appPath.includes("gnome-terminal")) terminalName = "gnome-terminal";
+  else if (appPath.includes("xterm")) terminalName = "xterm";
 
-    const child = spawn(appPath, [`--config-file=${configPath}`], { stdio: "ignore", detached: true });
-    child.unref();
-    terminalPids[key] = child.pid;
-    child.on("exit", () => { delete terminalPids[key]; });
-  } else {
-    const child = spawn(appPath, ["-e", `tmux attach -t ${session}`], { stdio: "ignore", detached: true });
-    child.unref();
-    terminalPids[key] = child.pid;
-    child.on("exit", () => { delete terminalPids[key]; });
+  const spawnArgs = getTerminalSpawnArgs(
+    terminalName, launcher.app, session, title, colorDef.bg,
+    launcher.fullscreen, platform.shell,
+  );
+
+  if (!spawnArgs) {
+    // Fallback: tmux session exists, user can attach manually
+    return;
+  }
+
+  // Write config file if needed (e.g., Ghostty)
+  if (spawnArgs.configFile && spawnArgs.configContent) {
+    writeFileSync(spawnArgs.configFile, spawnArgs.configContent);
+  }
+
+  const child = spawn(spawnArgs.bin, spawnArgs.args, { stdio: "ignore", detached: true });
+  child.unref();
+  terminalPids[key] = child.pid;
+  child.on("exit", () => { delete terminalPids[key]; });
+
+  // Run post-spawn script if needed (e.g., iTerm2, Terminal.app)
+  if (spawnArgs.postSpawnScript) {
+    setTimeout(() => exec(spawnArgs.postSpawnScript), 500);
   }
 }
 

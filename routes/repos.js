@@ -7,6 +7,7 @@ import {
   listEnvironments, upsertEnvironment, deleteEnvironment,
 } from "../db.js";
 import { COLORS, getAnthropicKey } from "../lib/config.js";
+import { getFolderPickerCommand } from "../lib/platform.js";
 
 const router = Router();
 
@@ -45,8 +46,28 @@ router.delete("/repos/:id", (req, res) => {
 });
 
 // One-click: pick a folder → auto-detect → create repo
-router.post("/add-repo", (_req, res) => {
-  const script = `osascript -e 'POSIX path of (choose folder with prompt "Select a git repository")'`;
+router.post("/add-repo", (req, res) => {
+  const { dir: providedDir } = req.body ?? {};
+
+  if (providedDir) {
+    // Manual path entry (used when no folder picker is available)
+    const folder = providedDir.trim().replace(/\/$/, "");
+    const id = basename(folder);
+    const workDir = dirname(folder);
+    exec(`git -C "${folder}" remote get-url origin 2>/dev/null`, (_gitErr, gitOut) => {
+      const url = (gitOut ?? "").trim();
+      try {
+        res.json(createRepo({ id, url, localDir: folder, workDir, mode: "worktree" }));
+      } catch (dbErr) {
+        res.status(400).json({ error: dbErr.message });
+      }
+    });
+    return;
+  }
+
+  const script = getFolderPickerCommand("Select a git repository");
+  if (!script) return res.json({ error: "no_folder_picker" });
+
   exec(script, (err, stdout) => {
     if (err) return res.status(400).json({ error: "Cancelled" });
     const folder = stdout.trim().replace(/\/$/, "");
@@ -120,7 +141,9 @@ router.post("/scan-folder", (req, res) => {
   if (providedDir) {
     doScan(providedDir.replace(/\/$/, ""));
   } else {
-    const script = `osascript -e 'POSIX path of (choose folder with prompt "Select a project or work directory")'`;
+    const script = getFolderPickerCommand("Select a project or work directory");
+    if (!script) return res.json({ error: "no_folder_picker" });
+
     exec(script, (err, stdout) => {
       if (err) return res.status(400).json({ error: "Cancelled" });
       doScan(stdout.trim().replace(/\/$/, ""));

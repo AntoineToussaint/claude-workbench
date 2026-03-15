@@ -89,7 +89,49 @@ body {
   gap: 20px;
 }
 
-.project-section {}
+.project-section {
+  position: relative;
+}
+
+/* Section drag handle (vertical reorder) */
+.section-drag-handle {
+  position: absolute;
+  left: -8px;
+  top: 6px;
+  width: 16px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.project-section:hover .section-drag-handle { opacity: 1; }
+.section-drag-handle:hover { background: #1f1f1f; }
+.section-drag-handle:active { cursor: grabbing; }
+
+/* Card drag handle (horizontal reorder) */
+.sortable-card-wrapper { position: relative; }
+.card-drag-handle {
+  position: absolute;
+  top: 14px;
+  right: 8px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 2;
+}
+.sortable-card-wrapper:hover .card-drag-handle { opacity: 1; }
+.card-drag-handle:hover { background: #1f1f1f; }
+.card-drag-handle:active { cursor: grabbing; }
 
 .project-header {
   display: flex;
@@ -510,6 +552,38 @@ body {
   cursor: pointer;
 }
 .confirm-release-btn:hover { background: #dc2626; }
+
+.release-status-info {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.release-warning {
+  font-size: 11px;
+  color: #f59e0b;
+  padding: 3px 8px;
+  background: #1a1400;
+  border-radius: 4px;
+}
+.release-info {
+  font-size: 11px;
+  color: #888;
+  padding: 3px 8px;
+  background: #1a1a1a;
+  border-radius: 4px;
+}
+
+.env-local-badge {
+  font-size: 8px;
+  color: #666;
+  background: #1f1f1f;
+  padding: 1px 4px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
 
 /* ── Settings modal ───────────────────────────────────────────────────── */
 .settings-modal { max-height: 80vh; width: 520px; }

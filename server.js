@@ -2,7 +2,7 @@ import express from "express";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { loadConfig, COLORS } from "./lib/config.js";
-import { listRepos } from "./db.js";
+import { listRepos, getSetting, setSetting } from "./db.js";
 import repoRoutes from "./routes/repos.js";
 import envRoutes from "./routes/environments.js";
 import githubRoutes from "./routes/github.js";
@@ -14,8 +14,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 delete process.env.CLAUDECODE;
 delete process.env.ANTHROPIC_API_KEY;
 
-// Ensure homebrew binaries are available
-process.env.PATH = `/opt/homebrew/bin:${process.env.PATH}`;
+// Ensure homebrew binaries are available (macOS only)
+import { getHomebrewPrefix } from "./lib/platform.js";
+const brewPrefix = getHomebrewPrefix();
+if (brewPrefix) {
+  process.env.PATH = `${brewPrefix}:${process.env.PATH}`;
+}
 
 const app = express();
 app.use(express.json());
@@ -29,6 +33,24 @@ app.get("/api/config", (_req, res) => {
     ...(COLORS[name] ?? { hex: "#888", bg: "#111" }),
   }));
   res.json({ ...config, colors, repos: listRepos() });
+});
+
+// ── Layout order persistence ────────────────────────────────────────────────
+
+app.get("/api/layout", (_req, res) => {
+  const cardOrder = getSetting("cardOrder", null);
+  const sectionOrder = getSetting("sectionOrder", null);
+  res.json({
+    cardOrder: cardOrder ? JSON.parse(cardOrder) : null,
+    sectionOrder: sectionOrder ? JSON.parse(sectionOrder) : null,
+  });
+});
+
+app.put("/api/layout", (req, res) => {
+  const { cardOrder, sectionOrder } = req.body;
+  if (cardOrder !== undefined) setSetting("cardOrder", JSON.stringify(cardOrder));
+  if (sectionOrder !== undefined) setSetting("sectionOrder", JSON.stringify(sectionOrder));
+  res.json({ ok: true });
 });
 
 // ── Route modules ───────────────────────────────────────────────────────────

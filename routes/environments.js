@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { exec } from "child_process";
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs";
 import { join, basename } from "path";
 import {
   getRepoById, listEnvironments, getEnvironment,
@@ -138,10 +138,15 @@ router.post("/environments/:color/release", (req, res) => {
   const { removeWorktree } = req.body ?? {};
   const env = getEnvironment(color);
 
-  if (env && removeWorktree) {
-    const repo = getRepoById(env.repoId);
-    if (repo?.mode === "worktree") {
-      exec(`cd "${repo.repoDir}" && git worktree remove "${env.path}" --force 2>&1`, () => {});
+  if (env) {
+    // Clean up injected "Current Task" section from CLAUDE.md
+    cleanInjectedContext(env.path);
+
+    if (removeWorktree) {
+      const repo = getRepoById(env.repoId);
+      if (repo?.mode === "worktree") {
+        exec(`cd "${repo.repoDir}" && git worktree remove "${env.path}" --force 2>&1`, () => {});
+      }
     }
   }
 
@@ -149,7 +154,114 @@ router.post("/environments/:color/release", (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Status ──────────────────────────────────────────────────────────────────
+function cleanInjectedContext(envPath) {
+  if (!envPath) return;
+  const claudePath = join(envPath, "CLAUDE.md");
+  if (!existsSync(claudePath)) return;
+  try {
+    const content = readFileSync(claudePath, "utf-8");
+    // Remove the injected "# Current Task" block and everything after it
+    const marker = "\n\n# Current Task";
+    const idx = content.indexOf(marker);
+    if (idx !== -1) {
+      const cleaned = content.slice(0, idx).trimEnd();
+      if (cleaned) {
+        writeFileSync(claudePath, cleaned + "\n");
+      } else {
+        unlinkSync(claudePath);
+      }
+    }
+  } catch {}
+}
+
+// ── Batched status (all environments) ────────────────────────────────────────
+
+router.get("/environments/statuses", (_req, res) => {
+  const envs = listEnvironments();
+  const colors = Object.keys(envs);
+  if (colors.length === 0) return res.json({});
+
+  const config = loadConfig();
+  let pending = colors.length;
+  const results = {};
+
+  colors.forEach((color) => {
+    fetchColorStatus(color, envs[color], config, (status) => {
+      results[color] = status;
+      if (--pending === 0) res.json(results);
+    });
+  });
+});
+
+function fetchColorStatus(color, env, config, cb) {
+  if (!env) return cb({ active: false });
+
+  const ghRepo = getGhRepo(env.repoId);
+  const gitCmd = `cd "${env.path}" && git status --porcelain && echo "---BRANCH---" && (git rev-list --left-right --count origin/main...HEAD 2>/dev/null || git rev-list --left-right --count origin/master...HEAD 2>/dev/null || git rev-list --left-right --count main...HEAD 2>/dev/null || git rev-list --left-right --count master...HEAD 2>/dev/null || echo "0\t0")`;
+
+  const isBaseBranch = ["main", "master"].includes(env.branch);
+  const prCmd = ghRepo && !isBaseBranch
+    ? `gh pr list --repo "${ghRepo}" --head "${env.branch}" --state open --json number,url,state,title,mergedAt --limit 1`
+    : null;
+
+  exec(gitCmd, (_err, gitOut) => {
+    const parts = (gitOut ?? "").split("---BRANCH---");
+    const dirty = (parts[0] ?? "").trim().split("\n").filter(Boolean);
+    const counts = (parts[1] ?? "0\t0").trim().split("\t");
+
+    const status = {
+      active: true,
+      branch: env.branch,
+      dirty: dirty.length > 0,
+      changedFiles: dirty.length,
+      behind: parseInt(counts[0]) || 0,
+      ahead: parseInt(counts[1]) || 0,
+      pr: null,
+      tmuxAlive: false,
+    };
+
+    const tmuxLauncher = (config.launchers ?? []).find((l) => l.type === "tmux-terminal");
+    const session = tmuxLauncher ? `wb-${tmuxLauncher.id}-${color}` : null;
+
+    function finish() {
+      if (!prCmd) return cb(status);
+      exec(prCmd, (_prErr, prOut) => {
+        try {
+          const prs = JSON.parse(prOut ?? "[]");
+          status.pr = prs[0] ?? null;
+        } catch {}
+        cb(status);
+      });
+    }
+
+    if (!session) return finish();
+
+    exec(`tmux has-session -t ${session} 2>/dev/null`, (tmuxErr) => {
+      status.tmuxAlive = !tmuxErr;
+      if (tmuxErr) return finish();
+
+      exec(`tmux capture-pane -t ${session}:.0 -p -S -30 2>/dev/null`, (_capErr, capOut) => {
+        const content = capOut ?? "";
+        const lines = content.split("\n").filter((l) => l.trim());
+        const lastLine = lines[lines.length - 1] ?? "";
+        const tail = lines.slice(-8).join("\n");
+
+        if (tail.match(/esc to interrupt/i)) {
+          status.claudeState = "working";
+        } else if (tail.match(/Do you want to (proceed|make this edit)/)) {
+          status.claudeState = "approval";
+        } else if (lastLine.match(/^[\s]*>/)) {
+          status.claudeState = "waiting";
+        } else if (lastLine.match(/^[\s]*[$%#]\s*$/)) {
+          status.claudeState = "shell";
+        }
+        finish();
+      });
+    });
+  });
+}
+
+// ── Status (single — kept for backward compat) ──────────────────────────────
 
 router.get("/environments/:color/status", (req, res) => {
   const { color } = req.params;

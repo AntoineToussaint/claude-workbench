@@ -3,11 +3,26 @@
   "version": "0.1.0",
   "description": "Parallel Claude Code workbench — color-coded worktrees, tmux, one-click terminal/editor launch",
   "type": "module",
+  "bin": {
+    "claude-workbench": "./bin/claude-workbench.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "routes/",
+    "src/",
+    "dist/",
+    "db.js",
+    "server.js",
+    "vite.config.js",
+    "index.html"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "start": "node server.js",
     "start:reset": "node server.js --reset",
+    "dev:all": "node server.js & npx vite & wait",
     "test": "vitest run"
   },
   "dependencies": {

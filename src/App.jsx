@@ -1,11 +1,67 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef, Component } from "react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  horizontalListSortingStrategy,
+  verticalListSortingStrategy,
+  arrayMove,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
-function api(path, opts) {
-  return fetch(`/api${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...opts,
-  }).then((r) => r.json());
+// ── API helper ──────────────────────────────────────────────────────────────
+
+async function api(path, opts) {
+  try {
+    const r = await fetch(`/api${path}`, {
+      headers: { "Content-Type": "application/json" },
+      ...opts,
+    });
+    const text = await r.text();
+    const data = text ? JSON.parse(text) : {};
+    if (!r.ok) {
+      if (typeof data === "object" && data !== null) data.ok = false;
+      return data.error ? data : { ok: false, error: `HTTP ${r.status}`, ...data };
+    }
+    return data;
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
 }
+
+// ── Error boundary ──────────────────────────────────────────────────────────
+
+class ErrorBoundary extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 40, textAlign: "center", color: "#ef4444" }}>
+          <h2 style={{ marginBottom: 12 }}>Something went wrong</h2>
+          <pre style={{ fontSize: 12, color: "#888", whiteSpace: "pre-wrap" }}>{this.state.error.message}</pre>
+          <button
+            onClick={() => { this.setState({ error: null }); window.location.reload(); }}
+            style={{ marginTop: 16, padding: "8px 20px", background: "#2a2a2a", border: "none", borderRadius: 5, color: "#ccc", cursor: "pointer" }}
+          >
+            Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ── Icons ───────────────────────────────────────────────────────────────────
 
 const ICONS = {
   terminal: (
@@ -28,9 +84,16 @@ const ICONS = {
       <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/>
     </svg>
   ),
+  grip: (
+    <svg width="10" height="14" viewBox="0 0 24 24" fill="#555">
+      <path d="M8 6h2v2H8V6zm6 0h2v2h-2V6zM8 11h2v2H8v-2zm6 0h2v2h-2v-2zm-6 5h2v2H8v-2zm6 0h2v2h-2v-2z"/>
+    </svg>
+  ),
 };
 
-function IssuePickerModal({ issues, loading, onPick, onClose }) {
+// ── Task picker modal ───────────────────────────────────────────────────────
+
+function TaskPickerModal({ issues, loading, onPick, onClose }) {
   const [search, setSearch] = useState("");
   const [customMode, setCustomMode] = useState(false);
   const [customTitle, setCustomTitle] = useState("");
@@ -128,18 +191,46 @@ function IssuePickerModal({ issues, loading, onPick, onClose }) {
   );
 }
 
+// ── Settings panel ──────────────────────────────────────────────────────────
+
 function SettingsPanel({ repos, onClose, onReposChanged }) {
   const [error, setError] = useState(null);
   const [adding, setAdding] = useState(false);
+  const [manualPath, setManualPath] = useState(false);
+  const [pathInput, setPathInput] = useState("");
+  const [confirmKill, setConfirmKill] = useState(false);
 
   async function handleBrowse() {
     setError(null);
     setAdding(true);
     const result = await api("/add-repo", { method: "POST" });
     setAdding(false);
+    if (result.error === "no_folder_picker") {
+      setManualPath(true);
+      return;
+    }
     if (result.error) {
       if (result.error !== "Cancelled") setError(result.error);
     } else {
+      onReposChanged();
+    }
+  }
+
+  async function handleManualAdd(e) {
+    e.preventDefault();
+    if (!pathInput.trim()) return;
+    setError(null);
+    setAdding(true);
+    const result = await api("/add-repo", {
+      method: "POST",
+      body: JSON.stringify({ dir: pathInput.trim() }),
+    });
+    setAdding(false);
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setManualPath(false);
+      setPathInput("");
       onReposChanged();
     }
   }
@@ -172,6 +263,21 @@ function SettingsPanel({ repos, onClose, onReposChanged }) {
           {adding ? "Select a folder..." : "+ Add Project"}
         </button>
 
+        {manualPath && (
+          <form onSubmit={handleManualAdd} style={{ padding: "0 18px 8px", display: "flex", gap: 8 }}>
+            <input
+              className="modal-search"
+              placeholder="/path/to/git/repo"
+              value={pathInput}
+              onChange={(e) => setPathInput(e.target.value)}
+              autoFocus
+              style={{ margin: 0, flex: 1 }}
+            />
+            <button type="submit" className="modal-submit-btn" disabled={!pathInput.trim() || adding}>Add</button>
+            <button type="button" className="modal-cancel-btn" onClick={() => setManualPath(false)}>Cancel</button>
+          </form>
+        )}
+
         <button
           className="add-repo-btn"
           onClick={async () => {
@@ -192,15 +298,28 @@ function SettingsPanel({ repos, onClose, onReposChanged }) {
 
         {error && <p className="form-error" style={{ padding: "0 18px 8px" }}>{error}</p>}
 
-        <button
-          className="kill-sessions-btn"
-          onClick={async () => {
-            const r = await api("/kill-sessions", { method: "POST" });
-            setError(r.killed > 0 ? null : null);
-          }}
-        >
-          Kill All Sessions
-        </button>
+        {!confirmKill ? (
+          <button
+            className="kill-sessions-btn"
+            onClick={() => setConfirmKill(true)}
+          >
+            Kill All Sessions
+          </button>
+        ) : (
+          <div style={{ display: "flex", gap: 8, padding: "0 18px 10px" }}>
+            <button
+              className="confirm-release-btn"
+              style={{ flex: 1, fontSize: 11 }}
+              onClick={async () => {
+                await api("/kill-sessions", { method: "POST" });
+                setConfirmKill(false);
+              }}
+            >
+              Confirm Kill All
+            </button>
+            <button className="modal-cancel-btn" onClick={() => setConfirmKill(false)}>Cancel</button>
+          </div>
+        )}
 
         <div className="modal-footer">
           <button onClick={onClose}>Close</button>
@@ -209,6 +328,8 @@ function SettingsPanel({ repos, onClose, onReposChanged }) {
     </div>
   );
 }
+
+// ── Repo picker ─────────────────────────────────────────────────────────────
 
 function RepoPickerModal({ repos, onPick, onClose }) {
   return (
@@ -234,6 +355,8 @@ function RepoPickerModal({ repos, onPick, onClose }) {
     </div>
   );
 }
+
+// ── Status bar ──────────────────────────────────────────────────────────────
 
 function StatusBar({ status }) {
   if (!status?.active) return null;
@@ -273,7 +396,9 @@ function StatusBar({ status }) {
   );
 }
 
-function EditIssueModal({ env, color, onClose, onSave }) {
+// ── Edit task modal ─────────────────────────────────────────────────────────
+
+function EditTaskModal({ env, onClose, onSave }) {
   const [title, setTitle] = useState(env.issue.title);
   const [body, setBody] = useState(env.issue.body ?? "");
   const [saving, setSaving] = useState(false);
@@ -321,11 +446,15 @@ function EditIssueModal({ env, color, onClose, onSave }) {
   );
 }
 
-function CreatePrModal({ color, proposal, onClose, onSubmit }) {
+// ── Create PR modal ─────────────────────────────────────────────────────────
+
+function CreatePrModal({ proposal, onClose, onSubmit }) {
   const [branch, setBranch] = useState(proposal.branch);
   const [title, setTitle] = useState(proposal.title);
   const [body, setBody] = useState(proposal.body);
   const [submitting, setSubmitting] = useState(false);
+
+  const canSubmit = title.trim() && (proposal.needsBranch ? branch.trim() : true);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -355,7 +484,7 @@ function CreatePrModal({ color, proposal, onClose, onSubmit }) {
           </div>
           <div className="edit-issue-actions">
             <button type="button" className="modal-cancel-btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="modal-submit-btn" disabled={!title.trim() || !branch.trim() || submitting}>
+            <button type="submit" className="modal-submit-btn" disabled={!canSubmit || submitting}>
               {submitting ? "Creating..." : "Create PR"}
             </button>
           </div>
@@ -365,7 +494,78 @@ function CreatePrModal({ color, proposal, onClose, onSubmit }) {
   );
 }
 
-function EnvCard({ color, env, launchers, status, multiRepo, onAssign, onRelease, onLaunch, onCreatePr, onUpdateIssue }) {
+// ── DnD wrappers ────────────────────────────────────────────────────────────
+
+function SortableCard({ id, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="sortable-card-wrapper">
+      <div className="card-drag-handle" {...attributes} {...listeners}>
+        {ICONS.grip}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function SortableSection({ id, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : 1,
+  };
+  return (
+    <section ref={setNodeRef} style={style} className="project-section">
+      <div className="section-drag-handle" {...attributes} {...listeners}>
+        {ICONS.grip}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// ── Release confirmation modal ──────────────────────────────────────────────
+
+function ReleaseModal({ color, status, onClose, onConfirm }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal confirm-modal" onClick={(e) => e.stopPropagation()}>
+        <h3>Release {color}?</h3>
+        <p className="confirm-text">This will remove the worktree and free the slot.</p>
+        {status?.active && (
+          <div className="release-status-info">
+            {status.changedFiles > 0 && (
+              <div className="release-warning">{status.changedFiles} uncommitted file{status.changedFiles > 1 ? "s" : ""}</div>
+            )}
+            {status.ahead > 0 && (
+              <div className="release-warning">{status.ahead} unpushed commit{status.ahead > 1 ? "s" : ""}</div>
+            )}
+            {status.pr && (
+              <div className="release-info">PR #{status.pr.number} is open</div>
+            )}
+            {!status.changedFiles && !status.ahead && !status.pr && (
+              <div className="release-info">Clean — no uncommitted or unpushed work</div>
+            )}
+          </div>
+        )}
+        <div className="confirm-actions">
+          <button className="modal-cancel-btn" onClick={onClose}>Cancel</button>
+          <button className="confirm-release-btn" onClick={onConfirm}>Release</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Environment card ────────────────────────────────────────────────────────
+
+function EnvCard({ color, env, launchers, status, multiRepo, onAssign, onRelease, onLaunch, onCreatePr, onUpdateTask }) {
   const merged = status?.merged;
   const [editing, setEditing] = useState(false);
   const labels = env?.issue?.labels ?? [];
@@ -380,7 +580,7 @@ function EnvCard({ color, env, launchers, status, multiRepo, onAssign, onRelease
           <button
             className="release-btn"
             onClick={() => onRelease(color.name)}
-            title="Release environment"
+            title="Release slot"
           >
             ×
           </button>
@@ -392,6 +592,7 @@ function EnvCard({ color, env, launchers, status, multiRepo, onAssign, onRelease
           <div className="env-issue-section" onClick={() => !merged && setEditing(true)} title="Click to edit">
             <div className="env-issue">
               {!env.issue.custom && <span className="env-issue-number">#{env.issue.number}</span>}
+              {env.issue.custom && <span className="env-local-badge">local</span>}
               <span className="env-issue-title">{env.issue.title}</span>
               {!merged && (
                 <button className="edit-issue-btn" onClick={(e) => { e.stopPropagation(); setEditing(true); }} title="Edit task">
@@ -460,11 +661,10 @@ function EnvCard({ color, env, launchers, status, multiRepo, onAssign, onRelease
           )}
 
           {editing && (
-            <EditIssueModal
+            <EditTaskModal
               env={env}
-              color={color.name}
               onClose={() => setEditing(false)}
-              onSave={(updates) => onUpdateIssue(color.name, updates)}
+              onSave={(updates) => onUpdateTask(color.name, updates)}
             />
           )}
         </div>
@@ -475,7 +675,7 @@ function EnvCard({ color, env, launchers, status, multiRepo, onAssign, onRelease
             style={{ borderColor: color.hex, color: color.hex }}
             onClick={() => onAssign(color.name)}
           >
-            + Assign Issue
+            + Assign Task
           </button>
         </div>
       )}
@@ -483,7 +683,9 @@ function EnvCard({ color, env, launchers, status, multiRepo, onAssign, onRelease
   );
 }
 
-export default function App() {
+// ── Main app ────────────────────────────────────────────────────────────────
+
+function AppInner() {
   const [config, setConfig] = useState(null);
   const [envs, setEnvs] = useState({});
   const [statuses, setStatuses] = useState({});
@@ -493,28 +695,45 @@ export default function App() {
   const [pickerRepoId, setPickerRepoId] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [releaseColor, setReleaseColor] = useState(null);
+  const [cardOrder, setCardOrder] = useState({});
+  const [sectionOrder, setSectionOrder] = useState(null);
+  const [prProposal, setPrProposal] = useState(null);
   const pollRef = useRef(null);
+  const abortRef = useRef(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   useEffect(() => {
-    api("/config").then(setConfig);
-    api("/environments").then(setEnvs);
+    api("/config").then((r) => !r.error && setConfig(r));
+    api("/environments").then((r) => !r.error && setEnvs(r));
+    api("/layout").then((r) => {
+      if (r.cardOrder) setCardOrder(r.cardOrder);
+      if (r.sectionOrder) setSectionOrder(r.sectionOrder);
+    });
   }, []);
 
-  // Poll statuses for active environments every 10s
+  // Batched status polling with AbortController
   useEffect(() => {
     function pollStatuses() {
-      const activeColors = Object.keys(envs);
-      if (activeColors.length === 0) return;
-      activeColors.forEach((color) => {
-        api(`/environments/${color}/status`).then((s) => {
-          setStatuses((prev) => ({ ...prev, [color]: s }));
-        });
-      });
+      if (abortRef.current) abortRef.current.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      fetch("/api/environments/statuses", { signal: controller.signal })
+        .then((r) => r.json())
+        .then((data) => setStatuses(data))
+        .catch(() => {}); // aborted or network error — ignore
     }
 
     pollStatuses();
     pollRef.current = setInterval(pollStatuses, 10000);
-    return () => clearInterval(pollRef.current);
+    return () => {
+      clearInterval(pollRef.current);
+      if (abortRef.current) abortRef.current.abort();
+    };
   }, [envs]);
 
   function fetchIssuesForRepo(repoId) {
@@ -527,12 +746,10 @@ export default function App() {
   function handleAssign(color) {
     const repos = config?.repos ?? [];
     if (repos.length === 1) {
-      // Single repo — skip repo picker, go straight to issues
       setPickerColor(color);
       setPickerRepoId(repos[0].id);
       fetchIssuesForRepo(repos[0].id);
     } else {
-      // Multiple repos — show repo picker first
       setPickerColor(color);
       setPickerRepoId(null);
     }
@@ -554,7 +771,7 @@ export default function App() {
     });
     if (result.ok) {
       const updated = await api("/environments");
-      setEnvs(updated);
+      if (!updated.error) setEnvs(updated);
     }
   }
 
@@ -571,7 +788,7 @@ export default function App() {
     });
     setStatuses((prev) => { const n = { ...prev }; delete n[color]; return n; });
     const updated = await api("/environments");
-    setEnvs(updated);
+    if (!updated.error) setEnvs(updated);
   }
 
   function handleLaunch(launcherId, color) {
@@ -581,19 +798,16 @@ export default function App() {
     });
   }
 
-  async function handleUpdateIssue(color, updates) {
+  async function handleUpdateTask(color, updates) {
     await api(`/environments/${color}/issue`, {
       method: "PATCH",
       body: JSON.stringify(updates),
     });
     const updated = await api("/environments");
-    setEnvs(updated);
+    if (!updated.error) setEnvs(updated);
   }
 
-  const [prProposal, setPrProposal] = useState(null); // { color, branch, title, body, needsBranch }
-
   async function handleCreatePr(color) {
-    // Get AI-generated proposal
     const proposal = await api(`/environments/${color}/propose-pr`, { method: "POST" });
     if (proposal.error) return alert(`Failed: ${proposal.error}`);
     setPrProposal({ color, ...proposal });
@@ -608,14 +822,55 @@ export default function App() {
     setPrProposal(null);
     if (result.ok) {
       alert(`PR created: ${result.output}`);
+      // Refresh status for this color
       const s = await api(`/environments/${color}/status`);
-      setStatuses((prev) => ({ ...prev, [color]: s }));
+      if (!s.error) setStatuses((prev) => ({ ...prev, [color]: s }));
       const updated = await api("/environments");
-      setEnvs(updated);
+      if (!updated.error) setEnvs(updated);
     } else {
       alert(`Failed: ${result.error}`);
     }
   }
+
+  // ── DnD handlers ──────────────────────────────────────────────────────────
+
+  function persistLayout(newCardOrder, newSectionOrder) {
+    const body = {};
+    if (newCardOrder !== undefined) body.cardOrder = newCardOrder;
+    if (newSectionOrder !== undefined) body.sectionOrder = newSectionOrder;
+    api("/layout", { method: "PUT", body: JSON.stringify(body) });
+  }
+
+  function handleCardDragEnd(repoId, event) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const currentOrder = cardOrder[repoId] ?? envsByRepoColors(repoId);
+    const oldIndex = currentOrder.indexOf(active.id);
+    const newIndex = currentOrder.indexOf(over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(currentOrder, oldIndex, newIndex);
+    const updated = { ...cardOrder, [repoId]: newOrder };
+    setCardOrder(updated);
+    persistLayout(updated, undefined);
+  }
+
+  function handleSectionDragEnd(event) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const currentOrder = orderedRepos.map((r) => r.id);
+    const oldIndex = currentOrder.indexOf(active.id);
+    const newIndex = currentOrder.indexOf(over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(currentOrder, oldIndex, newIndex);
+    setSectionOrder(newOrder);
+    persistLayout(undefined, newOrder);
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   if (!config) return <div className="loading">Loading...</div>;
 
@@ -624,7 +879,6 @@ export default function App() {
   const multiRepo = repos.length > 1;
   const hasRepos = repos.length > 0;
 
-  // No repos → show onboarding
   if (!hasRepos) {
     return (
       <div className="app">
@@ -639,7 +893,7 @@ export default function App() {
           <SettingsPanel
             repos={repos}
             onClose={() => setShowSettings(false)}
-            onReposChanged={() => { api("/config").then(setConfig); api("/environments").then(setEnvs); }}
+            onReposChanged={() => { api("/config").then((r) => !r.error && setConfig(r)); api("/environments").then((r) => !r.error && setEnvs(r)); }}
           />
         )}
       </div>
@@ -654,7 +908,31 @@ export default function App() {
     envsByRepo[rid].push({ color, env, colorDef: config.colors.find((c) => c.name === color) });
   }
 
-  // Find next free color
+  function envsByRepoColors(repoId) {
+    return (envsByRepo[repoId] ?? []).map((e) => e.color);
+  }
+
+  // Sort envs within each repo by persisted card order
+  for (const [repoId, repoEnvs] of Object.entries(envsByRepo)) {
+    const order = cardOrder[repoId];
+    if (order) {
+      repoEnvs.sort((a, b) => {
+        const ai = order.indexOf(a.color);
+        const bi = order.indexOf(b.color);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      });
+    }
+  }
+
+  // Sort repos by persisted section order
+  const orderedRepos = sectionOrder
+    ? [...repos].sort((a, b) => {
+        const ai = sectionOrder.indexOf(a.id);
+        const bi = sectionOrder.indexOf(b.id);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      })
+    : repos;
+
   const usedColors = new Set(Object.keys(envs));
   const freeColors = config.colors.filter((c) => !usedColors.has(c.name));
 
@@ -666,52 +944,66 @@ export default function App() {
           + Project
         </button>
       </header>
-      <main className="board-sections">
-        {repos.map((repo) => {
-          const repoEnvs = envsByRepo[repo.id] ?? [];
-          return (
-            <section key={repo.id} className="project-section">
-              <div className="project-header">
-                {freeColors.length > 0 && (
-                  <button
-                    className="new-task-btn"
-                    style={{ borderColor: freeColors[0].hex, color: freeColors[0].hex }}
-                    onClick={() => {
-                      setPickerColor(freeColors[0].name);
-                      setPickerRepoId(repo.id);
-                      fetchIssuesForRepo(repo.id);
-                    }}
-                  >
-                    +
-                  </button>
-                )}
-                <span className="project-name">{repo.id}</span>
-                {repo.repo && <span className="project-url">{repo.repo.split("/").slice(-2).join("/")}</span>}
-                <span className="project-env-count">{repoEnvs.length}</span>
-              </div>
-              {repoEnvs.length > 0 && (
-                <div className="project-envs">
-                  {repoEnvs.map(({ color, env, colorDef }) => (
-                    <EnvCard
-                      key={color}
-                      color={colorDef ?? { name: color, hex: "#888", bg: "#111" }}
-                      env={env}
-                      status={statuses[color]}
-                      launchers={launchers}
-                      multiRepo={multiRepo}
-                      onAssign={handleAssign}
-                      onRelease={handleRelease}
-                      onLaunch={handleLaunch}
-                      onCreatePr={handleCreatePr}
-                      onUpdateIssue={handleUpdateIssue}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-          );
-        })}
-      </main>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
+        <SortableContext items={orderedRepos.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+          <main className="board-sections">
+            {orderedRepos.map((repo) => {
+              const repoEnvs = envsByRepo[repo.id] ?? [];
+              const cardIds = repoEnvs.map((e) => e.color);
+              return (
+                <SortableSection key={repo.id} id={repo.id}>
+                  <div className="project-header">
+                    {freeColors.length > 0 && (
+                      <button
+                        className="new-task-btn"
+                        style={{ borderColor: freeColors[0].hex, color: freeColors[0].hex }}
+                        onClick={() => {
+                          setPickerColor(freeColors[0].name);
+                          setPickerRepoId(repo.id);
+                          fetchIssuesForRepo(repo.id);
+                        }}
+                      >
+                        +
+                      </button>
+                    )}
+                    <span className="project-name">{repo.id}</span>
+                    {repo.repo && <span className="project-url">{repo.repo.split("/").slice(-2).join("/")}</span>}
+                    <span className="project-env-count">{repoEnvs.length}</span>
+                  </div>
+                  {repoEnvs.length > 0 && (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(event) => handleCardDragEnd(repo.id, event)}
+                    >
+                      <SortableContext items={cardIds} strategy={horizontalListSortingStrategy}>
+                        <div className="project-envs">
+                          {repoEnvs.map(({ color, env, colorDef }) => (
+                            <SortableCard key={color} id={color}>
+                              <EnvCard
+                                color={colorDef ?? { name: color, hex: "#888", bg: "#111" }}
+                                env={env}
+                                status={statuses[color]}
+                                launchers={launchers}
+                                multiRepo={multiRepo}
+                                onAssign={handleAssign}
+                                onRelease={handleRelease}
+                                onLaunch={handleLaunch}
+                                onCreatePr={handleCreatePr}
+                                onUpdateTask={handleUpdateTask}
+                              />
+                            </SortableCard>
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  )}
+                </SortableSection>
+              );
+            })}
+          </main>
+        </SortableContext>
+      </DndContext>
       {pickerColor && !pickerRepoId && repos.length > 1 && (
         <RepoPickerModal
           repos={repos}
@@ -720,7 +1012,7 @@ export default function App() {
         />
       )}
       {pickerColor && pickerRepoId && (
-        <IssuePickerModal
+        <TaskPickerModal
           issues={issues}
           loading={issuesLoading}
           onPick={handlePick}
@@ -728,20 +1020,15 @@ export default function App() {
         />
       )}
       {releaseColor && (
-        <div className="modal-overlay" onClick={() => setReleaseColor(null)}>
-          <div className="modal confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Release {releaseColor}?</h3>
-            <p className="confirm-text">This will remove the worktree and free the slot.</p>
-            <div className="confirm-actions">
-              <button className="modal-cancel-btn" onClick={() => setReleaseColor(null)}>Cancel</button>
-              <button className="confirm-release-btn" onClick={confirmRelease}>Release</button>
-            </div>
-          </div>
-        </div>
+        <ReleaseModal
+          color={releaseColor}
+          status={statuses[releaseColor]}
+          onClose={() => setReleaseColor(null)}
+          onConfirm={confirmRelease}
+        />
       )}
       {prProposal && (
         <CreatePrModal
-          color={prProposal.color}
           proposal={prProposal}
           onClose={() => setPrProposal(null)}
           onSubmit={handleSubmitPr}
@@ -751,9 +1038,17 @@ export default function App() {
         <SettingsPanel
           repos={repos}
           onClose={() => setShowSettings(false)}
-          onReposChanged={() => { api("/config").then(setConfig); api("/environments").then(setEnvs); }}
+          onReposChanged={() => { api("/config").then((r) => !r.error && setConfig(r)); api("/environments").then((r) => !r.error && setEnvs(r)); }}
         />
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }
