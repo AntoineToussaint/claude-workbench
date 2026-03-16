@@ -28,6 +28,8 @@ import { SortableCard } from "./components/SortableCard";
 import { SortableSection } from "./components/SortableSection";
 import { ReleaseModal } from "./components/ReleaseModal";
 import { EnvCard } from "./components/EnvCard";
+import { CommandPalette } from "./components/CommandPalette";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 
 // ── Main app ────────────────────────────────────────────────────────────────
 
@@ -46,8 +48,24 @@ function AppInner() {
   const [cardOrder, setCardOrder] = useState({});
   const [sectionOrder, setSectionOrder] = useState(null);
   const [prProposal, setPrProposal] = useState(null);
+  const [showPalette, setShowPalette] = useState(false);
   const pollRef = useRef(null);
   const abortRef = useRef(null);
+
+  function closeAllModals() {
+    setShowPalette(false);
+    setShowSettings(false);
+    setPickerColor(null);
+    setPickerRepoId(null);
+    setReleaseColor(null);
+    setPrProposal(null);
+  }
+
+  useKeyboardShortcuts({
+    "meta+k": () => setShowPalette((v) => !v),
+    "meta+,": () => setShowSettings(true),
+    "Escape": closeAllModals,
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -110,6 +128,14 @@ function AppInner() {
       setPickerColor(color);
       setPickerRepoId(null);
     }
+  }
+
+  function handleNewTask() {
+    const colors = config?.colors ?? [];
+    const used = new Set(Object.keys(envs));
+    const free = colors.filter((c) => !used.has(c.name));
+    if (free.length === 0) return;
+    handleAssign(free[0].name);
   }
 
   function handlePickRepo(repoId) {
@@ -229,7 +255,40 @@ function AppInner() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  if (!config) return <div className="loading">Loading...</div>;
+  if (!config) return (
+    <div className="app">
+      <header className="app-header">
+        <div className="skeleton skeleton-text" style={{ width: 140 }} />
+        <div style={{ marginLeft: "auto" }}>
+          <div className="skeleton skeleton-btn" />
+        </div>
+      </header>
+      <main className="board-sections">
+        <div className="skeleton-section">
+          <div className="skeleton skeleton-text" style={{ width: 120, marginBottom: 12 }} />
+          <div className="project-envs">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="skeleton-card">
+                <div className="skeleton-card-header">
+                  <div className="skeleton skeleton-dot" />
+                  <div className="skeleton skeleton-text" style={{ width: 60 }} />
+                </div>
+                <div className="skeleton-card-body">
+                  <div className="skeleton skeleton-text" style={{ width: "80%" }} />
+                  <div className="skeleton skeleton-text" style={{ width: "60%" }} />
+                  <div className="skeleton skeleton-text" style={{ width: 100, marginTop: 12 }} />
+                  <div className="skeleton-card-actions">
+                    <div className="skeleton skeleton-btn" />
+                    <div className="skeleton skeleton-btn" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
 
   if (config.setupRequired) {
     return (
@@ -248,11 +307,25 @@ function AppInner() {
     return (
       <div className="app">
         <div className="onboarding">
+          <div className="onboarding-icon">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+              <rect x="4" y="8" width="40" height="32" rx="4" stroke="currentColor" strokeWidth="2" />
+              <line x1="4" y1="16" x2="44" y2="16" stroke="currentColor" strokeWidth="2" />
+              <circle cx="10" cy="12" r="1.5" fill="#EF4444" />
+              <circle cx="15" cy="12" r="1.5" fill="#F59E0B" />
+              <circle cx="20" cy="12" r="1.5" fill="#22C55E" />
+              <line x1="12" y1="24" x2="24" y2="24" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" />
+              <line x1="12" y1="30" x2="32" y2="30" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" />
+              <line x1="12" y1="36" x2="20" y2="36" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </div>
           <h1>Claude Workbench</h1>
-          <p>Add a project to get started.</p>
+          <p>Run multiple Claude Code instances in parallel.</p>
+          <p className="onboarding-sub">Each gets a color-coded worktree, terminal, and editor.</p>
           <button className="onboarding-btn" onClick={() => setShowSettings(true)}>
             + Add Project
           </button>
+          <span className="onboarding-hint">or press <kbd>&#8984;</kbd> + <kbd>,</kbd></span>
         </div>
         {showSettings && (
           <SettingsPanel
@@ -411,6 +484,16 @@ function AppInner() {
           onSubmit={handleSubmitPr}
         />
       )}
+      <CommandPalette
+        isOpen={showPalette}
+        onClose={() => setShowPalette(false)}
+        environments={envs}
+        launchers={launchers}
+        onLaunch={handleLaunch}
+        onCreatePr={handleCreatePr}
+        onAssign={handleNewTask}
+        onShowSettings={() => setShowSettings(true)}
+      />
       {showSettings && (
         <SettingsPanel
           repos={repos}
