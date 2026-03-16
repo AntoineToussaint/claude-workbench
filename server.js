@@ -7,6 +7,8 @@ import repoRoutes from "./routes/repos.js";
 import envRoutes from "./routes/environments.js";
 import githubRoutes from "./routes/github.js";
 import launcherRoutes from "./routes/launchers.js";
+import webhookRoutes from "./routes/webhooks.js";
+import { detectMultiplexer, getMultiplexer } from "./lib/multiplexer/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -23,7 +25,8 @@ if (brewPrefix) {
 
 // Check required dependencies on startup
 const missingDeps = [];
-if (!commandExists("tmux")) missingDeps.push("tmux");
+const detectedMux = detectMultiplexer();
+if (detectedMux === "none") missingDeps.push("tmux (or cmux)");
 if (!commandExists("gh")) missingDeps.push("gh (GitHub CLI)");
 if (missingDeps.length > 0) {
   const installHint = process.platform === "darwin" ? `brew install ${missingDeps.map(d => d.split(" ")[0]).join(" ")}` : `apt install ${missingDeps.map(d => d.split(" ")[0]).join(" ")}`;
@@ -36,15 +39,32 @@ app.use(express.json());
 
 // ── Config endpoint ─────────────────────────────────────────────────────────
 
-app.get("/api/config", (_req, res) => {
+app.get("/api/config", async (_req, res) => {
   const config = loadConfig();
   if (!config) return res.json({ setupRequired: true });
 
-  const colors = (config.colors ?? Object.keys(COLORS)).map((name) => ({
+  const colors = Object.keys(COLORS).map((name) => ({
     name,
-    ...(COLORS[name] ?? { hex: "#888", bg: "#111" }),
+    ...COLORS[name],
   }));
-  res.json({ ...config, colors, repos: listRepos(), missingDeps });
+
+  // Auto-detect launchers if none configured
+  let { launchers } = config;
+  if (!launchers || launchers.length === 0) {
+    const defaults = generateDefaultConfig(detectPlatform());
+    launchers = defaults.launchers;
+    // Persist so we don't re-detect every time
+    saveConfig({ ...config, launchers });
+  }
+
+  const muxType = detectMultiplexer();
+  let muxCapabilities = { stateDetection: false, notifications: false, embeddedBrowser: false, splitPanes: false };
+  try {
+    const mux = await getMultiplexer();
+    muxCapabilities = mux.getCapabilities();
+  } catch {}
+
+  res.json({ ...config, launchers, colors, repos: listRepos(), missingDeps, multiplexer: { type: muxType, capabilities: muxCapabilities } });
 });
 
 // ── Setup wizard ────────────────────────────────────────────────────────────
@@ -52,18 +72,19 @@ app.get("/api/config", (_req, res) => {
 app.get("/api/setup/detect", (_req, res) => {
   const platform = detectPlatform();
   const defaults = generateDefaultConfig(platform);
+  const muxType = detectMultiplexer();
   res.json({
     platform,
     defaults,
     allColors: Object.keys(COLORS),
     missingDeps,
+    multiplexer: muxType,
   });
 });
 
 app.post("/api/setup", (req, res) => {
-  const { colors, port, launchers } = req.body;
+  const { port, launchers } = req.body;
   const config = {
-    colors: colors ?? Object.keys(COLORS),
     port: port ?? 3232,
     launchers: launchers ?? [],
   };
@@ -102,6 +123,7 @@ app.use("/api", repoRoutes);
 app.use("/api", envRoutes);
 app.use("/api", githubRoutes);
 app.use("/api", launcherRoutes);
+app.use("/api", webhookRoutes);
 
 // ── Static files ────────────────────────────────────────────────────────────
 
@@ -112,7 +134,7 @@ export { app, loadConfig, COLORS };
 
 // Only listen when run directly (not imported by tests)
 const isMainModule = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/^\//, ""));
-if (isMainModule || !process.env.VITEST) {
+if ((isMainModule || !process.env.VITEST) && !process.env.ELECTRON) {
   const config = loadConfig();
   const port = config?.port ?? 3232;
   app.listen(port, () => {

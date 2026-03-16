@@ -68,11 +68,11 @@ function SetupWizard({ onComplete }) {
   const [detecting, setDetecting] = useState(true);
   const [platform, setPlatform] = useState(null);
   const [defaults, setDefaults] = useState(null);
-  const [allColors, setAllColors] = useState([]);
+  const [multiplexer, setMultiplexer] = useState(null);
+
   const [missingDeps, setMissingDeps] = useState([]);
 
   // Config state
-  const [selectedColors, setSelectedColors] = useState([]);
   const [port, setPort] = useState(3232);
   const [selectedTerminal, setSelectedTerminal] = useState(null);
   const [terminalFullscreen, setTerminalFullscreen] = useState(false);
@@ -83,9 +83,8 @@ function SetupWizard({ onComplete }) {
     api("/setup/detect").then((data) => {
       setPlatform(data.platform);
       setDefaults(data.defaults);
-      setAllColors(data.allColors);
       setMissingDeps(data.missingDeps || []);
-      setSelectedColors(data.defaults.colors);
+      setMultiplexer(data.multiplexer || null);
       setPort(data.defaults.port);
       setSelectedTerminal(data.platform.terminal);
       setTerminalFullscreen(data.platform.terminal.name === "ghostty");
@@ -121,17 +120,12 @@ function SetupWizard({ onComplete }) {
     }
     await api("/setup", {
       method: "POST",
-      body: JSON.stringify({ colors: selectedColors, port, launchers }),
+      body: JSON.stringify({ port, launchers }),
     });
     setSaving(false);
     onComplete();
   }
 
-  function toggleColor(c) {
-    setSelectedColors((prev) =>
-      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]
-    );
-  }
 
   if (detecting) {
     return (
@@ -143,11 +137,6 @@ function SetupWizard({ onComplete }) {
       </div>
     );
   }
-
-  const COLOR_DATA = {
-    blue: "#3B82F6", green: "#22C55E", red: "#EF4444", yellow: "#F59E0B",
-    black: "#374151", purple: "#A855F7", orange: "#F97316", cyan: "#06B6D4",
-  };
 
   const steps = [
     // Step 0: Welcome + dependencies
@@ -171,6 +160,10 @@ function SetupWizard({ onComplete }) {
           <span className="setup-detection-label">Shell</span>
           <span className="setup-detection-value">{platform.shell.split("/").pop()}</span>
         </div>
+        <div className="setup-detection">
+          <span className="setup-detection-label">Multiplexer</span>
+          <span className="setup-detection-value">{multiplexer ?? "none"}</span>
+        </div>
       </div>
       {missingDeps.length > 0 && (
         <div className="setup-warnings">
@@ -186,27 +179,7 @@ function SetupWizard({ onComplete }) {
       )}
     </div>,
 
-    // Step 1: Colors
-    <div key="colors" className="setup-step">
-      <h2>Color Slots</h2>
-      <p className="setup-text">Each color is a parallel workspace. Pick which ones to use.</p>
-      <div className="setup-colors">
-        {allColors.map((c) => (
-          <button
-            key={c}
-            className={`setup-color-btn ${selectedColors.includes(c) ? "active" : ""}`}
-            style={{ "--color": COLOR_DATA[c] ?? "#888" }}
-            onClick={() => toggleColor(c)}
-          >
-            <span className="setup-color-dot" style={{ background: COLOR_DATA[c] ?? "#888" }} />
-            {c}
-          </button>
-        ))}
-      </div>
-      <p className="setup-hint">{selectedColors.length} slot{selectedColors.length !== 1 ? "s" : ""} selected</p>
-    </div>,
-
-    // Step 2: Terminal + Editor
+    // Step 1: Terminal + Editor
     <div key="launchers" className="setup-step">
       <h2>Launchers</h2>
       <p className="setup-text">How to open terminals and editors for each workspace.</p>
@@ -261,10 +234,6 @@ function SetupWizard({ onComplete }) {
       <h2>Ready</h2>
       <div className="setup-summary">
         <div className="setup-summary-row">
-          <span>Slots</span>
-          <span>{selectedColors.join(", ")}</span>
-        </div>
-        <div className="setup-summary-row">
           <span>Terminal</span>
           <span>{selectedTerminal?.name ?? "none"}{terminalFullscreen ? " (fullscreen)" : ""}</span>
         </div>
@@ -275,6 +244,10 @@ function SetupWizard({ onComplete }) {
         <div className="setup-summary-row">
           <span>Port</span>
           <span>{port}</span>
+        </div>
+        <div className="setup-summary-row">
+          <span>Multiplexer</span>
+          <span>{multiplexer ?? "none"}</span>
         </div>
       </div>
       <p className="setup-hint">You can change these later in settings.</p>
@@ -301,7 +274,7 @@ function SetupWizard({ onComplete }) {
             <button
               className="modal-submit-btn"
               onClick={() => setStep(step + 1)}
-              disabled={step === 1 && selectedColors.length === 0}
+              disabled={false}
             >
               Next
             </button>
@@ -646,6 +619,31 @@ function StatusBar({ status }) {
         >
           PR #{status.pr.number}
         </a>
+      )}
+      {status.checks && status.checks.total > 0 && (
+        <span className={`status-tag ci-status ci-has-tooltip ${status.checks.fail > 0 ? "ci-fail" : status.checks.pending > 0 ? "ci-pending" : "ci-pass"}`}>
+          {status.checks.fail > 0
+            ? `CI ${status.checks.fail} failed`
+            : status.checks.pending > 0
+            ? `CI ${status.checks.pending} pending`
+            : `CI ${status.checks.pass} passed`}
+          {status.checks.items && status.checks.items.length > 0 && (
+            <span className="ci-tooltip" onClick={(e) => e.stopPropagation()}>
+              {status.checks.items.map((c, i) => (
+                <span key={i} className="ci-tooltip-row">
+                  <span className={`ci-tooltip-icon ${c.status === "SUCCESS" ? "ci-ok" : c.status === "FAILURE" || c.status === "TIMED_OUT" || c.status === "CANCELLED" ? "ci-err" : "ci-wait"}`}>
+                    {c.status === "SUCCESS" ? "\u2713" : c.status === "FAILURE" || c.status === "TIMED_OUT" || c.status === "CANCELLED" ? "\u2717" : "\u25CB"}
+                  </span>
+                  {c.url ? (
+                    <a href={c.url} target="_blank" rel="noreferrer" className="ci-tooltip-link">{c.name}</a>
+                  ) : (
+                    <span className="ci-tooltip-name">{c.name}</span>
+                  )}
+                </span>
+              ))}
+            </span>
+          )}
+        </span>
       )}
     </div>
   );
@@ -1232,6 +1230,18 @@ function AppInner() {
                     <span className="project-name">{repo.id}</span>
                     {repo.repo && <span className="project-url">{repo.repo.split("/").slice(-2).join("/")}</span>}
                     <span className="project-env-count">{repoEnvs.length}</span>
+                    <button
+                      className="project-delete-btn"
+                      title="Remove project"
+                      onClick={async () => {
+                        if (!confirm(`Remove project "${repo.id}"? This will release all its environments.`)) return;
+                        await api(`/repos/${encodeURIComponent(repo.id)}`, { method: "DELETE" });
+                        api("/config").then((r) => !r.error && setConfig(r));
+                        api("/environments").then((r) => !r.error && setEnvs(r));
+                      }}
+                    >
+                      ×
+                    </button>
                   </div>
                   {repoEnvs.length > 0 && (
                     <DndContext

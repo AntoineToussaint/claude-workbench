@@ -66,7 +66,7 @@ describe("platform detection", () => {
 
       // Should have at least a terminal launcher on any platform with a terminal
       if (platform.terminal.name !== "fallback") {
-        const termLauncher = config.launchers.find((l) => l.type === "tmux-terminal");
+        const termLauncher = config.launchers.find((l) => l.type === "tmux-terminal" || l.type === "mux-terminal");
         expect(termLauncher).toBeDefined();
         expect(termLauncher.panes).toHaveLength(2);
       }

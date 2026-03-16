@@ -8,6 +8,8 @@ import {
 } from "../db.js";
 import { loadConfig, COLORS } from "../lib/config.js";
 import { getGhRepo } from "../lib/github.js";
+import { getMultiplexer } from "../lib/multiplexer/index.js";
+import { getWebhookState } from "./webhooks.js";
 
 const router = Router();
 
@@ -203,7 +205,7 @@ function fetchColorStatus(color, env, config, cb) {
 
   const isBaseBranch = ["main", "master"].includes(env.branch);
   const prCmd = ghRepo && !isBaseBranch
-    ? `gh pr list --repo "${ghRepo}" --head "${env.branch}" --state open --json number,url,state,title,mergedAt --limit 1`
+    ? `gh pr view "${env.branch}" --repo "${ghRepo}" --json number,url,state,title,mergedAt,statusCheckRollup 2>/dev/null`
     : null;
 
   exec(gitCmd, (_err, gitOut) => {
@@ -219,18 +221,36 @@ function fetchColorStatus(color, env, config, cb) {
       behind: parseInt(counts[0]) || 0,
       ahead: parseInt(counts[1]) || 0,
       pr: null,
-      tmuxAlive: false,
+      muxAlive: false,
+      tmuxAlive: false, // backward compat alias
     };
 
-    const tmuxLauncher = (config.launchers ?? []).find((l) => l.type === "tmux-terminal");
-    const session = tmuxLauncher ? `wb-${tmuxLauncher.id}-${color}` : null;
+    // Find the mux launcher (supports both "tmux-terminal" and "mux-terminal")
+    const muxLauncher = (config.launchers ?? []).find(
+      (l) => l.type === "tmux-terminal" || l.type === "mux-terminal"
+    );
+    const session = muxLauncher ? `wb-${muxLauncher.id}-${color}` : null;
 
     function finish() {
       if (!prCmd) return cb(status);
       exec(prCmd, (_prErr, prOut) => {
         try {
-          const prs = JSON.parse(prOut ?? "[]");
-          status.pr = prs[0] ?? null;
+          const pr = JSON.parse(prOut ?? "{}");
+          if (pr.number) {
+            const checks = pr.statusCheckRollup ?? [];
+            status.pr = { number: pr.number, url: pr.url, state: pr.state, title: pr.title, mergedAt: pr.mergedAt };
+            status.checks = {
+              total: checks.length,
+              pass: checks.filter(c => c.status === "COMPLETED" && c.conclusion === "SUCCESS").length,
+              fail: checks.filter(c => ["FAILURE", "TIMED_OUT", "CANCELLED"].includes(c.conclusion)).length,
+              pending: checks.filter(c => c.status !== "COMPLETED").length,
+              items: checks.map(c => ({
+                name: c.name || c.context,
+                status: c.conclusion || c.status || "PENDING",
+                url: c.detailsUrl || c.targetUrl,
+              })),
+            };
+          }
         } catch {}
         cb(status);
       });
@@ -238,28 +258,53 @@ function fetchColorStatus(color, env, config, cb) {
 
     if (!session) return finish();
 
-    exec(`tmux has-session -t ${session} 2>/dev/null`, (tmuxErr) => {
-      status.tmuxAlive = !tmuxErr;
-      if (tmuxErr) return finish();
+    getMultiplexer().then((mux) => {
+      const capabilities = mux.getCapabilities();
 
-      exec(`tmux capture-pane -t ${session}:.0 -p -S -30 2>/dev/null`, (_capErr, capOut) => {
-        const content = capOut ?? "";
-        const lines = content.split("\n").filter((l) => l.trim());
-        const lastLine = lines[lines.length - 1] ?? "";
-        const tail = lines.slice(-8).join("\n");
-
-        if (tail.match(/esc to interrupt/i)) {
-          status.claudeState = "working";
-        } else if (tail.match(/Do you want to (proceed|make this edit)/)) {
-          status.claudeState = "approval";
-        } else if (lastLine.match(/^[\s]*>/)) {
-          status.claudeState = "waiting";
-        } else if (lastLine.match(/^[\s]*[$%#]\s*$/)) {
-          status.claudeState = "shell";
+      mux.hasSession(session).then((alive) => {
+        status.muxAlive = alive;
+        status.tmuxAlive = alive; // backward compat
+        if (!alive) {
+          // If no session, try webhook state as fallback
+          if (!capabilities.stateDetection) {
+            const webhookState = getWebhookState(color);
+            if (webhookState) status.claudeState = webhookState;
+          }
+          return finish();
         }
-        finish();
-      });
-    });
+
+        if (!capabilities.stateDetection) {
+          // Use webhook-based state detection for non-tmux multiplexers
+          const webhookState = getWebhookState(color);
+          if (webhookState) status.claudeState = webhookState;
+          return finish();
+        }
+
+        // Capture pane content for state detection
+        mux.capturePane(session, 0, 30).then((content) => {
+          if (content) {
+            const lines = content.split("\n").filter((l) => l.trim());
+            const lastLine = lines[lines.length - 1] ?? "";
+            const tail = lines.slice(-8).join("\n");
+
+            if (tail.match(/esc to interrupt/i)) {
+              status.claudeState = "working";
+            } else if (tail.match(/Do you want to (proceed|make this edit)/)) {
+              status.claudeState = "approval";
+            } else if (lastLine.match(/^[\s]*>/)) {
+              status.claudeState = "waiting";
+            } else if (lastLine.match(/^[\s]*[$%#]\s*$/)) {
+              status.claudeState = "shell";
+            }
+          } else {
+            // capturePane returned null — try webhook fallback
+            const webhookState = getWebhookState(color);
+            if (webhookState) status.claudeState = webhookState;
+          }
+          finish();
+        }).catch(() => finish());
+      }).catch(() => finish());
+    }).catch(() => finish());
   });
 }
 
@@ -277,7 +322,7 @@ router.get("/environments/:color/status", (req, res) => {
 
   const isBaseBranch = ["main", "master"].includes(env.branch);
   const prCmd = ghRepo && !isBaseBranch
-    ? `gh pr list --repo "${ghRepo}" --head "${env.branch}" --state open --json number,url,state,title,mergedAt --limit 1`
+    ? `gh pr view "${env.branch}" --repo "${ghRepo}" --json number,url,state,title,mergedAt,statusCheckRollup 2>/dev/null`
     : null;
 
   exec(gitCmd, (_err, gitOut) => {
@@ -296,15 +341,32 @@ router.get("/environments/:color/status", (req, res) => {
       tmuxAlive: false,
     };
 
-    const tmuxLauncher = (config.launchers ?? []).find((l) => l.type === "tmux-terminal");
-    const session = tmuxLauncher ? `wb-${tmuxLauncher.id}-${color}` : null;
+    // Find the mux launcher (supports both "tmux-terminal" and "mux-terminal")
+    const muxLauncher = (config.launchers ?? []).find(
+      (l) => l.type === "tmux-terminal" || l.type === "mux-terminal"
+    );
+    const session = muxLauncher ? `wb-${muxLauncher.id}-${color}` : null;
 
     function finish() {
       if (!prCmd) return res.json(status);
       exec(prCmd, (_prErr, prOut) => {
         try {
-          const prs = JSON.parse(prOut ?? "[]");
-          status.pr = prs[0] ?? null;
+          const pr = JSON.parse(prOut ?? "{}");
+          if (pr.number) {
+            const checks = pr.statusCheckRollup ?? [];
+            status.pr = { number: pr.number, url: pr.url, state: pr.state, title: pr.title, mergedAt: pr.mergedAt };
+            status.checks = {
+              total: checks.length,
+              pass: checks.filter(c => c.status === "COMPLETED" && c.conclusion === "SUCCESS").length,
+              fail: checks.filter(c => ["FAILURE", "TIMED_OUT", "CANCELLED"].includes(c.conclusion)).length,
+              pending: checks.filter(c => c.status !== "COMPLETED").length,
+              items: checks.map(c => ({
+                name: c.name || c.context,
+                status: c.conclusion || c.status || "PENDING",
+                url: c.detailsUrl || c.targetUrl,
+              })),
+            };
+          }
         } catch {}
         res.json(status);
       });
@@ -312,29 +374,50 @@ router.get("/environments/:color/status", (req, res) => {
 
     if (!session) return finish();
 
-    exec(`tmux has-session -t ${session} 2>/dev/null`, (tmuxErr) => {
-      status.tmuxAlive = !tmuxErr;
-      if (tmuxErr) return finish();
+    getMultiplexer().then((mux) => {
+      const capabilities = mux.getCapabilities();
 
-      // Detect Claude Code state from pane content (use scrollback for full picture)
-      exec(`tmux capture-pane -t ${session}:.0 -p -S -30 2>/dev/null`, (_capErr, capOut) => {
-        const content = capOut ?? "";
-        const lines = content.split("\n").filter((l) => l.trim());
-        const lastLine = lines[lines.length - 1] ?? "";
-        const tail = lines.slice(-8).join("\n");
-
-        if (tail.match(/esc to interrupt/i)) {
-          status.claudeState = "working";
-        } else if (tail.match(/Do you want to (proceed|make this edit)/)) {
-          status.claudeState = "approval";
-        } else if (lastLine.match(/^[\s]*>/)) {
-          status.claudeState = "waiting";
-        } else if (lastLine.match(/^[\s]*[$%#]\s*$/)) {
-          status.claudeState = "shell";
+      mux.hasSession(session).then((alive) => {
+        status.muxAlive = alive;
+        status.tmuxAlive = alive; // backward compat
+        if (!alive) {
+          if (!capabilities.stateDetection) {
+            const webhookState = getWebhookState(color);
+            if (webhookState) status.claudeState = webhookState;
+          }
+          return finish();
         }
-        finish();
-      });
-    });
+
+        if (!capabilities.stateDetection) {
+          const webhookState = getWebhookState(color);
+          if (webhookState) status.claudeState = webhookState;
+          return finish();
+        }
+
+        // Detect Claude Code state from pane content (use scrollback for full picture)
+        mux.capturePane(session, 0, 30).then((content) => {
+          if (content) {
+            const lines = content.split("\n").filter((l) => l.trim());
+            const lastLine = lines[lines.length - 1] ?? "";
+            const tail = lines.slice(-8).join("\n");
+
+            if (tail.match(/esc to interrupt/i)) {
+              status.claudeState = "working";
+            } else if (tail.match(/Do you want to (proceed|make this edit)/)) {
+              status.claudeState = "approval";
+            } else if (lastLine.match(/^[\s]*>/)) {
+              status.claudeState = "waiting";
+            } else if (lastLine.match(/^[\s]*[$%#]\s*$/)) {
+              status.claudeState = "shell";
+            }
+          } else {
+            const webhookState = getWebhookState(color);
+            if (webhookState) status.claudeState = webhookState;
+          }
+          finish();
+        }).catch(() => finish());
+      }).catch(() => finish());
+    }).catch(() => finish());
   });
 });
 

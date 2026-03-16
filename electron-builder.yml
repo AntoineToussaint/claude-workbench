@@ -1,0 +1,38 @@
+appId: com.anthropic.claude-workbench
+productName: Claude Workbench
+directories:
+  output: release
+  buildResources: electron/resources
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.developer-tools
+  identity: null
+  hardenedRuntime: true
+  entitlements: electron/entitlements.mac.plist
+  entitlementsInherit: electron/entitlements.mac.plist
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+win:
+  target: nsis
+linux:
+  target:
+    - AppImage
+    - deb
+files:
+  - server.js
+  - db.js
+  - "lib/**/*"
+  - "routes/**/*"
+  - "dist/**/*"
+  - "electron/**/*"
+  - package.json
+npmRebuild: true
+afterSign: electron/notarize.js

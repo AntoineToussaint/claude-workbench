@@ -2,6 +2,7 @@
   "name": "claude-workbench",
   "version": "0.1.0",
   "description": "Parallel Claude Code workbench — color-coded worktrees, tmux, one-click terminal/editor launch",
+  "main": "electron/main.js",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -17,6 +18,7 @@
     "lib/",
     "routes/",
     "dist/",
+    "electron/",
     "db.js",
     "server.js",
     "index.html"
@@ -26,9 +28,12 @@
     "build": "vite build",
     "start": "node server.js",
     "start:reset": "node server.js --reset",
-    "dev:all": "node server.js & npx vite & wait",
+    "dev:all": "node server.js & pnpm vite & wait",
     "test": "vitest run",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "postinstall": "npx @electron/rebuild --only better-sqlite3 2>/dev/null || true",
+    "electron:dev": "npm run build && electron .",
+    "electron:build": "npm run build && electron-builder build --mac"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -42,6 +47,9 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.4.1",
     "vite": "^6.4.1",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.0",
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.0",
+    "@electron/notarize": "^3.0.0"
   }
 }

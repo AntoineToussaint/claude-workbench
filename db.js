@@ -3,7 +3,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = join(__dirname, "workbench.db");
+const DB_PATH = process.env.WORKBENCH_DB_PATH || join(__dirname, "workbench.db");
 
 // --reset flag wipes the DB
 if (process.argv.includes("--reset")) {

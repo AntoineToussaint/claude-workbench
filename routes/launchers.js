@@ -4,7 +4,8 @@ import { writeFileSync } from "fs";
 import { basename, join } from "path";
 import { getRepoById, getEnvironment } from "../db.js";
 import { loadConfig, COLORS } from "../lib/config.js";
-import { detectPlatform, getTerminalSpawnArgs, getWindowFocusCommand, getClipboardCommand, commandExists } from "../lib/platform.js";
+import { detectPlatform, getTerminalSpawnArgs, getWindowFocusCommand, getClipboardCommand } from "../lib/platform.js";
+import { getMultiplexer } from "../lib/multiplexer/index.js";
 
 const router = Router();
 const terminalPids = {};
@@ -39,20 +40,23 @@ function interpolate(template, vars) {
 
 // ── Kill all sessions ───────────────────────────────────────────────────────
 
-router.post("/kill-sessions", (_req, res) => {
-  if (!commandExists("tmux")) return res.json({ ok: true, killed: 0 });
-  exec(`tmux list-sessions -F "#{session_name}" 2>/dev/null`, (_err, out) => {
-    const sessions = (out ?? "").split("\n").filter((s) => s.startsWith("wb-"));
+router.post("/kill-sessions", async (_req, res) => {
+  try {
+    const mux = await getMultiplexer();
+    const sessions = await mux.listSessions("wb-");
     if (sessions.length === 0) return res.json({ ok: true, killed: 0 });
-    exec(sessions.map((s) => `tmux kill-session -t ${s}`).join(" ; "), () => {
-      res.json({ ok: true, killed: sessions.length });
-    });
-  });
+    for (const s of sessions) {
+      await mux.killSession(s);
+    }
+    res.json({ ok: true, killed: sessions.length });
+  } catch {
+    res.json({ ok: true, killed: 0 });
+  }
 });
 
 // ── Launch ──────────────────────────────────────────────────────────────────
 
-router.post("/launch", (req, res) => {
+router.post("/launch", async (req, res) => {
   const { launcherId, color } = req.body;
   const config = loadConfig();
   const launcher = (config.launchers ?? []).find((l) => l.id === launcherId);
@@ -72,18 +76,25 @@ router.post("/launch", (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ ok: true });
     });
-  } else if (launcher.type === "tmux-terminal") {
-    if (!commandExists("tmux")) {
-      const hint = process.platform === "darwin" ? "brew install tmux" : "apt install tmux";
-      return res.status(500).json({ error: `tmux is not installed. Run: ${hint}` });
+  } else if (launcher.type === "tmux-terminal" || launcher.type === "mux-terminal") {
+    try {
+      await launchMuxTerminal(launcher, color, envPath, colorDef, title, res);
+    } catch (e) {
+      if (!res.headersSent) res.status(500).json({ error: e.message });
     }
-    launchTmuxTerminal(launcher, color, envPath, colorDef, title, res);
   } else {
     res.status(400).json({ error: `Unknown launcher type: ${launcher.type}` });
   }
 });
 
-function launchTmuxTerminal(launcher, color, envPath, colorDef, title, res) {
+async function launchMuxTerminal(launcher, color, envPath, colorDef, title, res) {
+  const mux = await getMultiplexer();
+  const muxType = mux.getType();
+
+  if (muxType === "none") {
+    return res.json({ ok: true, skipped: true, reason: "no multiplexer available" });
+  }
+
   const key = pidKey(launcher.id, color);
   const session = tmuxSession(launcher.id, color);
 
@@ -94,87 +105,46 @@ function launchTmuxTerminal(launcher, color, envPath, colorDef, title, res) {
     return res.json({ ok: true, reused: true });
   }
 
-  exec(`tmux has-session -t ${session} 2>/dev/null`, (err) => {
-    if (!err) {
-      spawnTerminalApp(launcher, session, color, colorDef, title);
-      return res.json({ ok: true, reattached: true });
+  const exists = await mux.hasSession(session);
+
+  if (exists) {
+    // Session exists — reattach (unless cmux, which IS the terminal)
+    if (muxType !== "cmux") {
+      spawnTerminalApp(launcher, session, color, colorDef, title, mux);
     }
+    return res.json({ ok: true, reattached: true });
+  }
 
-    const panes = launcher.panes ?? [{ cmd: null }];
-    let focusPane = 0;
-    const cmds = [];
+  // Create the session
+  const panes = launcher.panes ?? [{ cmd: null }];
+  const config = loadConfig();
+  const clipCmd = getClipboardCommand();
 
-    const firstCmd = panes[0]?.cmd;
-    if (firstCmd) {
-      cmds.push(`tmux new-session -d -s ${session} -c "${envPath}" '${firstCmd}'`);
-      cmds.push(`tmux set-option -t ${session} remain-on-exit on`);
-    } else {
-      cmds.push(`tmux new-session -d -s ${session} -c "${envPath}"`);
-    }
-
-    cmds.push(
-      `tmux set-environment -g -u CLAUDECODE`,
-      `tmux set-environment -g -u ANTHROPIC_API_KEY`,
-      `tmux set-environment -t ${session} -u CLAUDECODE`,
-      `tmux set-environment -t ${session} -u ANTHROPIC_API_KEY`,
-      `tmux set-option -t ${session} mouse on`,
-      `tmux set-option -t ${session} set-clipboard on`,
-      `tmux set-option -t ${session} allow-passthrough on`,
-    );
-
-    // Clipboard integration (platform-aware)
-    const clipCmd = getClipboardCommand();
-    if (clipCmd) {
-      cmds.push(
-        `tmux set-option -t ${session} copy-command '${clipCmd}'`,
-        `tmux bind-key -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel '${clipCmd}'`,
-        `tmux bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel '${clipCmd}'`,
-      );
-    }
-
-    cmds.push(
-      `tmux set-option -t ${session} status-style "bg=${colorDef.hex},fg=#000000"`,
-      `tmux set-option -t ${session} status-left " ■ ${color.toUpperCase()} │ ${title} "`,
-      `tmux set-option -t ${session} status-left-length 120`,
-      `tmux set-option -t ${session} status-right ""`,
-      `tmux set-option -t ${session} window-status-format ""`,
-      `tmux set-option -t ${session} window-status-current-format ""`,
-    );
-
-    for (let i = 1; i < panes.length; i++) {
-      const paneCmd = panes[i]?.cmd;
-      if (paneCmd) {
-        cmds.push(`tmux split-window -h -t ${session} -c "${envPath}" '${paneCmd}'`);
-      } else {
-        cmds.push(`tmux split-window -h -t ${session} -c "${envPath}"`);
-      }
-    }
-
-    const lastPane = panes.length - 1;
-    let paneOffset = 0;
-    const config = loadConfig();
-    const port = config?.port ?? 3232;
-    const objectiveCmd = `while clear && curl -s http://localhost:${port}/api/environments/${color}/objective 2>/dev/null; do sleep 5; done`;
-    cmds.push(`tmux split-window -v -b -t ${session}:.${lastPane} -c "${envPath}" -l 20% '${objectiveCmd}'`);
-    paneOffset = 1;
-
-    panes.forEach((pane, i) => {
-      if (pane.focus) focusPane = i <= lastPane - 1 ? i : i + paneOffset;
-    });
-
-    cmds.push(`tmux select-pane -t ${session}:.${focusPane}`);
-
-    exec(cmds.join(" && "), (err) => {
-      if (err) return res.status(500).json({ error: err.message });
-      spawnTerminalApp(launcher, session, color, colorDef, title);
-      res.json({ ok: true });
-    });
+  await mux.createSession(session, envPath, panes, {
+    colorDef,
+    title,
+    clipboardCmd: clipCmd,
+    port: config?.port ?? 3232,
+    color,
   });
+
+  // Spawn terminal app (unless cmux, which IS the terminal)
+  if (muxType !== "cmux") {
+    spawnTerminalApp(launcher, session, color, colorDef, title, mux);
+  }
+
+  res.json({ ok: true });
 }
 
-function spawnTerminalApp(launcher, session, color, colorDef, title) {
+function spawnTerminalApp(launcher, session, color, colorDef, title, mux) {
   const key = pidKey(launcher.id, color);
   const platform = detectPlatform();
+  const attachCommand = mux.getAttachCommand(session);
+
+  if (!attachCommand) {
+    // No attach command — session exists, but no way to attach from a terminal
+    return;
+  }
 
   // Determine terminal name from the app path or launcher id
   let terminalName = launcher.id;
@@ -189,11 +159,11 @@ function spawnTerminalApp(launcher, session, color, colorDef, title) {
 
   const spawnArgs = getTerminalSpawnArgs(
     terminalName, launcher.app, session, title, colorDef.bg,
-    launcher.fullscreen, platform.shell,
+    launcher.fullscreen, platform.shell, attachCommand,
   );
 
   if (!spawnArgs) {
-    // Fallback: tmux session exists, user can attach manually
+    // Fallback: session exists, user can attach manually
     return;
   }
 
