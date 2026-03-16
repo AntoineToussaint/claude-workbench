@@ -118,9 +118,15 @@ async function launchMuxTerminal(launcher, color, envPath, colorDef, title, res)
       });
       if (attached) {
         // Terminal is still open — try to focus it
-        const focusCmd = getWindowFocusCommand(terminalPids[key]);
-        if (focusCmd) exec(focusCmd);
-        return res.json({ ok: true, focused: true });
+        const pid = terminalPids[key];
+        const focusCmd = pid ? getWindowFocusCommand(pid) : null;
+        if (focusCmd) {
+          exec(focusCmd);
+          return res.json({ ok: true, focused: true });
+        }
+        // Can't focus (PID unknown) — reattach in a new terminal
+        spawnTerminalApp(launcher, session, color, colorDef, title, mux);
+        return res.json({ ok: true, reattached: true });
       }
       // No client attached — reattach with a new terminal window
       spawnTerminalApp(launcher, session, color, colorDef, title, mux);

@@ -1,19 +1,27 @@
 import { app, BrowserWindow, Menu } from "electron";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { execSync } from "child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Dev mode: --dev flag or WORKBENCH_DEV env
+const isDev = process.argv.includes("--dev") || process.env.WORKBENCH_DEV === "1";
+
 // Signal to server.js that Electron manages the lifecycle
 process.env.ELECTRON = "1";
+
+// Dev mode uses separate userData so both can run simultaneously
+if (isDev) {
+  app.setName("Claude Workbench Dev");
+  app.setPath("userData", join(app.getPath("userData"), "-dev"));
+}
 
 // Store DB in Electron's userData directory
 process.env.WORKBENCH_DB_PATH = join(app.getPath("userData"), "workbench.db");
 
 let mainWindow = null;
 
-// Single instance lock
+// Single instance lock (dev and stable get separate locks via different userData)
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -26,14 +34,15 @@ if (!gotLock) {
   });
 }
 
-async function createWindow(port) {
+async function createWindow(url) {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 800,
     minHeight: 500,
     titleBarStyle: "hiddenInset",
-    backgroundColor: "#0f0f0f",
+    backgroundColor: "#0a0a0b",
+    title: isDev ? "Claude Workbench (Dev)" : "Claude Workbench",
     webPreferences: {
       preload: join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -41,8 +50,13 @@ async function createWindow(port) {
     },
   });
 
-  mainWindow.loadURL(`http://localhost:${port}`);
+  mainWindow.loadURL(url);
   mainWindow.on("closed", () => { mainWindow = null; });
+
+  // Auto-open devtools in dev mode
+  if (isDev) {
+    mainWindow.webContents.openDevTools({ mode: "detach" });
+  }
 }
 
 app.whenReady().then(async () => {
@@ -52,43 +66,60 @@ app.whenReady().then(async () => {
     setapp.init();
   } catch {}
 
-  // Import and start the server
-  const { app: server, loadConfig } = await import("../server.js");
-  const config = loadConfig();
-  const port = config?.port ?? 3232;
+  if (isDev) {
+    // Dev mode: connect to Vite dev server (which proxies /api to the stable backend)
+    // Requires: pnpm start (backend) + pnpm dev (Vite) running separately
+    const vitePort = 5173;
+    try {
+      await fetch(`http://localhost:${vitePort}/`);
+      console.log(`Dev mode: using Vite at http://localhost:${vitePort}`);
+    } catch {
+      console.error("Dev mode requires Vite dev server running: pnpm dev");
+      console.error("Also ensure backend is running: pnpm start");
+    }
+    createWindow(`http://localhost:${vitePort}`);
+  } else {
+    // Stable mode: start the Express server and serve built dist/
+    const { app: server, loadConfig } = await import("../server.js");
+    const config = loadConfig();
+    const port = config?.port ?? 3232;
 
-  const actualPort = await new Promise((resolve, reject) => {
-    const s = server.listen(port, () => {
-      console.log(`Workbench server on port ${port}`);
-      resolve(port);
+    const actualPort = await new Promise((resolve, reject) => {
+      const s = server.listen(port, () => {
+        console.log(`Workbench server on port ${port}`);
+        resolve(port);
+      });
+      s.on("error", (err) => {
+        if (err.code === "EADDRINUSE") {
+          const s2 = server.listen(0, () => {
+            const freePort = s2.address().port;
+            console.log(`Port ${port} in use, using ${freePort}`);
+            resolve(freePort);
+          });
+          s2.on("error", reject);
+        } else {
+          reject(err);
+        }
+      });
     });
-    s.on("error", (err) => {
-      if (err.code === "EADDRINUSE") {
-        // Port busy — let OS pick a free one
-        const s2 = server.listen(0, () => {
-          const freePort = s2.address().port;
-          console.log(`Port ${port} in use, using ${freePort}`);
-          resolve(freePort);
-        });
-        s2.on("error", reject);
-      } else {
-        reject(err);
-      }
-    });
-  });
 
-  createWindow(actualPort);
+    createWindow(`http://localhost:${actualPort}`);
+  }
 
   // macOS: re-create window when dock icon clicked
+  const lastUrl = mainWindow?.webContents?.getURL?.() ?? `http://localhost:${isDev ? 5173 : 3232}`;
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow(actualPort);
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow(lastUrl);
+    }
   });
 
   // macOS menu
   if (process.platform === "darwin") {
+    const appLabel = isDev ? "Claude Workbench Dev" : app.name;
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       {
-        label: app.name,
+        label: appLabel,
         submenu: [
           { role: "about" },
           { type: "separator" },

@@ -32,7 +32,8 @@
     "test": "vitest run",
     "prepublishOnly": "npm run build",
     "electron:rebuild": "npx @electron/rebuild --only better-sqlite3 2>/dev/null || true",
-    "electron:dev": "npm run electron:rebuild && npm run build && electron .",
+    "electron:stable": "npm run electron:rebuild && npm run build && electron .",
+    "electron:dev": "electron . --dev",
     "electron:build": "npm run electron:rebuild && npm run build && electron-builder build --mac"
   },
   "dependencies": {
