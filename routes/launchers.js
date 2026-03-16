@@ -108,8 +108,21 @@ async function launchMuxTerminal(launcher, color, envPath, colorDef, title, res)
   const exists = await mux.hasSession(session);
 
   if (exists) {
-    // Session exists — reattach (unless cmux, which IS the terminal)
+    // Session exists — try to focus the existing terminal window, don't spawn a new one
     if (muxType !== "cmux") {
+      // Check if any tmux client is already attached to this session
+      const attached = await new Promise((resolve) => {
+        exec(`tmux list-clients -t ${session} -F "#{client_pid}" 2>/dev/null`, (err, stdout) => {
+          resolve(!err && stdout.trim().length > 0);
+        });
+      });
+      if (attached) {
+        // Terminal is still open — try to focus it
+        const focusCmd = getWindowFocusCommand(terminalPids[key]);
+        if (focusCmd) exec(focusCmd);
+        return res.json({ ok: true, focused: true });
+      }
+      // No client attached — reattach with a new terminal window
       spawnTerminalApp(launcher, session, color, colorDef, title, mux);
     }
     return res.json({ ok: true, reattached: true });
