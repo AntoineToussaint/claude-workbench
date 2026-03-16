@@ -8,6 +8,7 @@ import "./styles/layout.css";
 import "./styles/cards.css";
 import "./styles/modals.css";
 import "./styles/wizard.css";
+import "./styles/toast.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

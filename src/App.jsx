@@ -17,6 +17,8 @@ import {
 
 import api from "./lib/api";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ToastProvider, useToast } from "./hooks/useToast.jsx";
+import { ConfirmProvider, useConfirm } from "./hooks/useConfirm.jsx";
 import { SetupWizard } from "./components/SetupWizard";
 import { TaskPickerModal } from "./components/TaskPickerModal";
 import { SettingsPanel } from "./components/SettingsPanel";
@@ -30,6 +32,8 @@ import { EnvCard } from "./components/EnvCard";
 // ── Main app ────────────────────────────────────────────────────────────────
 
 function AppInner() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [config, setConfig] = useState(null);
   const [envs, setEnvs] = useState({});
   const [statuses, setStatuses] = useState({});
@@ -68,7 +72,16 @@ function AppInner() {
 
       fetch("/api/environments/statuses", { signal: controller.signal })
         .then((r) => r.json())
-        .then((data) => setStatuses(data))
+        .then((data) => {
+          setStatuses(data);
+          // Update dock badge with attention-needing count
+          if (window.electronAPI?.setBadge) {
+            const attentionCount = Object.values(data).filter(
+              (s) => s.claudeState === "approval" || s.claudeState === "waiting"
+            ).length;
+            window.electronAPI.setBadge(attentionCount);
+          }
+        })
         .catch(() => {}); // aborted or network error — ignore
     }
 
@@ -153,7 +166,7 @@ function AppInner() {
 
   async function handleCreatePr(color) {
     const proposal = await api(`/environments/${color}/propose-pr`, { method: "POST" });
-    if (proposal.error) return alert(`Failed: ${proposal.error}`);
+    if (proposal.error) return toast.error("PR proposal failed", proposal.error);
     setPrProposal({ color, ...proposal });
   }
 
@@ -165,14 +178,14 @@ function AppInner() {
     });
     setPrProposal(null);
     if (result.ok) {
-      alert(`PR created: ${result.output}`);
+      toast.success("PR created", result.output);
       // Refresh status for this color
       const s = await api(`/environments/${color}/status`);
       if (!s.error) setStatuses((prev) => ({ ...prev, [color]: s }));
       const updated = await api("/environments");
       if (!updated.error) setEnvs(updated);
     } else {
-      alert(`Failed: ${result.error}`);
+      toast.error("PR creation failed", result.error);
     }
   }
 
@@ -325,7 +338,7 @@ function AppInner() {
                       className="project-delete-btn"
                       title="Remove project"
                       onClick={async () => {
-                        if (!confirm(`Remove project "${repo.id}"? This will release all its environments.`)) return;
+                        if (!(await confirm("Remove project?", `Remove project "${repo.id}"? This will release all its environments.`, { confirmText: "Remove", danger: true }))) return;
                         await api(`/repos/${encodeURIComponent(repo.id)}`, { method: "DELETE" });
                         api("/config").then((r) => !r.error && setConfig(r));
                         api("/environments").then((r) => !r.error && setEnvs(r));
@@ -412,7 +425,11 @@ function AppInner() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <AppInner />
+      <ToastProvider>
+        <ConfirmProvider>
+          <AppInner />
+        </ConfirmProvider>
+      </ToastProvider>
     </ErrorBoundary>
   );
 }

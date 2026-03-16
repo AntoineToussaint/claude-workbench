@@ -1,6 +1,7 @@
-import { app, BrowserWindow, Menu } from "electron";
+import { app, BrowserWindow, Menu, ipcMain } from "electron";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { readFileSync, writeFileSync } from "fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -21,6 +22,22 @@ process.env.WORKBENCH_DB_PATH = join(app.getPath("userData"), "workbench.db");
 
 let mainWindow = null;
 
+// ── Window state persistence ──────────────────────────────────────
+const stateFile = join(app.getPath("userData"), "window-state.json");
+
+function loadWindowState() {
+  try {
+    return JSON.parse(readFileSync(stateFile, "utf-8"));
+  } catch { return null; }
+}
+
+function saveWindowState(win) {
+  if (!win || win.isDestroyed()) return;
+  const bounds = win.getBounds();
+  const state = { ...bounds, isMaximized: win.isMaximized(), isFullScreen: win.isFullScreen() };
+  try { writeFileSync(stateFile, JSON.stringify(state)); } catch {}
+}
+
 // Single instance lock (dev and stable get separate locks via different userData)
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -35,13 +52,19 @@ if (!gotLock) {
 }
 
 async function createWindow(url) {
+  const savedState = loadWindowState();
+
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: savedState?.width ?? 1200,
+    height: savedState?.height ?? 800,
+    x: savedState?.x,
+    y: savedState?.y,
     minWidth: 800,
     minHeight: 500,
     titleBarStyle: "hiddenInset",
-    backgroundColor: "#0a0a0b",
+    backgroundColor: "#00000000",
+    vibrancy: "under-window",
+    visualEffectState: "active",
     title: isDev ? "Claude Workbench (Dev)" : "Claude Workbench",
     webPreferences: {
       preload: join(__dirname, "preload.js"),
@@ -50,8 +73,22 @@ async function createWindow(url) {
     },
   });
 
+  if (savedState?.isMaximized) {
+    mainWindow.maximize();
+  }
+
   mainWindow.loadURL(url);
   mainWindow.on("closed", () => { mainWindow = null; });
+
+  // ── Debounced window state save on resize/move ────────────────
+  let saveTimeout = null;
+  const debouncedSave = () => {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => saveWindowState(mainWindow), 300);
+  };
+  mainWindow.on("resize", debouncedSave);
+  mainWindow.on("move", debouncedSave);
+  mainWindow.on("close", () => saveWindowState(mainWindow));
 
   // Auto-open devtools in dev mode
   if (isDev) {
@@ -60,6 +97,13 @@ async function createWindow(url) {
 }
 
 app.whenReady().then(async () => {
+  // Dock badge IPC handler
+  ipcMain.on("set-badge", (_event, count) => {
+    if (process.platform === "darwin") {
+      app.setBadgeCount(count);
+    }
+  });
+
   // Setapp integration (optional)
   try {
     const setapp = await import("@anthropic-ai/setapp-framework");

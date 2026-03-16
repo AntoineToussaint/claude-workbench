@@ -1,5 +1,6 @@
 import { useState } from "react";
 import api from "../lib/api";
+import { useConfirm } from "../hooks/useConfirm.jsx";
 
 export function SettingsPanel({ repos, onClose, onReposChanged }) {
   const [error, setError] = useState(null);
@@ -7,6 +8,7 @@ export function SettingsPanel({ repos, onClose, onReposChanged }) {
   const [manualPath, setManualPath] = useState(false);
   const [pathInput, setPathInput] = useState("");
   const [confirmKill, setConfirmKill] = useState(false);
+  const confirm = useConfirm();
 
   async function handleBrowse() {
     setError(null);
@@ -44,7 +46,7 @@ export function SettingsPanel({ repos, onClose, onReposChanged }) {
   }
 
   async function handleDelete(id) {
-    if (!confirm(`Remove project "${id}"?`)) return;
+    if (!(await confirm("Remove project?", `Remove project "${id}"?`, { confirmText: "Remove", danger: true }))) return;
     await api(`/repos/${encodeURIComponent(id)}`, { method: "DELETE" });
     onReposChanged();
   }
