@@ -1,0 +1,227 @@
+/* ================================================================
+   Layout — Header, board sections, project groups, drag handles
+   ================================================================ */
+
+/* ── Onboarding (empty state) ───────────────────────────────────── */
+.onboarding {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: var(--sp-3);
+}
+.onboarding h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+.onboarding p {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+.onboarding-btn {
+  margin-top: var(--sp-2);
+  padding: 10px 24px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.onboarding-btn:hover {
+  background: var(--accent-hover);
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-5);
+  padding-left: 80px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  -webkit-app-region: drag;
+  position: relative;
+  z-index: 10;
+}
+
+.app-header button,
+.app-header select,
+.app-header input {
+  -webkit-app-region: no-drag;
+}
+
+.app-header h1 {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+
+.header-repo {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--color-purple-bg);
+  border-radius: var(--radius-sm);
+  color: var(--color-purple);
+  border: 1px solid var(--color-purple-border);
+}
+
+.settings-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border-medium);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.settings-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Board (project sections) ───────────────────────────────────── */
+.board-sections {
+  flex: 1;
+  padding: var(--sp-4) var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.project-section {
+  position: relative;
+  animation: slideUp var(--duration-normal) var(--ease-out) both;
+}
+
+/* ── Section drag handle (vertical reorder) ─────────────────────── */
+.section-drag-handle {
+  position: absolute;
+  left: -8px;
+  top: 6px;
+  width: 16px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+.project-section:hover .section-drag-handle { opacity: 1; }
+.section-drag-handle:hover { background: var(--bg-elevated); }
+.section-drag-handle:active { cursor: grabbing; }
+
+/* ── Card drag handle (horizontal reorder) ──────────────────────── */
+.sortable-card-wrapper { position: relative; }
+.card-drag-handle {
+  position: absolute;
+  top: 14px;
+  right: 8px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+  z-index: 2;
+}
+.sortable-card-wrapper:hover .card-drag-handle { opacity: 1; }
+.card-drag-handle:hover { background: var(--bg-elevated); }
+.card-drag-handle:active { cursor: grabbing; }
+
+/* ── Project header ─────────────────────────────────────────────── */
+.project-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
+.project-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+}
+
+.project-url {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.project-env-count {
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  padding: 1px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+}
+
+.project-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity var(--duration-fast), color var(--duration-fast);
+}
+.project-header:hover .project-delete-btn { opacity: 1; color: var(--text-secondary); }
+.project-delete-btn:hover { color: var(--color-danger) !important; }
+
+/* ── New task button ────────────────────────────────────────────── */
+.new-task-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 2px dashed var(--border-medium);
+  border-radius: 50%;
+  font-size: 22px;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all var(--duration-fast) var(--ease-out);
+  color: var(--text-tertiary);
+}
+.new-task-btn:hover {
+  background: var(--bg-surface);
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+}
+
+/* ── Project environments row ───────────────────────────────────── */
+.project-envs {
+  display: flex;
+  flex-direction: row;
+  gap: var(--sp-3);
+  overflow-x: auto;
+}

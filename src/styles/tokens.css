@@ -1,0 +1,81 @@
+/* ================================================================
+   Design Tokens — Claude Workbench
+   ================================================================ */
+
+:root {
+  /* ── Layered backgrounds ──────────────────────────────────────── */
+  --bg-base: #0a0a0b;
+  --bg-surface: #131315;
+  --bg-elevated: #1c1c1e;
+  --bg-overlay: #242428;
+
+  /* ── Glass ────────────────────────────────────────────────────── */
+  --glass-bg: rgba(22, 22, 24, 0.78);
+  --glass-blur: 20px;
+  --glass-border: rgba(255, 255, 255, 0.07);
+
+  /* ── Borders ──────────────────────────────────────────────────── */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-medium: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* ── Text ─────────────────────────────────────────────────────── */
+  --text-primary: #f0f0f0;
+  --text-secondary: #8e8e93;
+  --text-tertiary: #48484a;
+
+  /* ── Accent ───────────────────────────────────────────────────── */
+  --accent: #3B82F6;
+  --accent-hover: #2563EB;
+  --accent-glow: rgba(59, 130, 246, 0.25);
+
+  /* ── Semantic colors ──────────────────────────────────────────── */
+  --color-success: #22c55e;
+  --color-success-bg: rgba(34, 197, 94, 0.12);
+  --color-success-border: rgba(34, 197, 94, 0.20);
+
+  --color-danger: #ef4444;
+  --color-danger-bg: rgba(239, 68, 68, 0.12);
+  --color-danger-border: rgba(239, 68, 68, 0.20);
+
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.12);
+  --color-warning-border: rgba(245, 158, 11, 0.20);
+
+  --color-purple: #818cf8;
+  --color-purple-bg: rgba(129, 140, 248, 0.12);
+  --color-purple-border: rgba(129, 140, 248, 0.20);
+
+  --color-lime: #a3e635;
+  --color-lime-bg: rgba(163, 230, 53, 0.12);
+
+  /* ── Shadows ──────────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  /* ── Radius ───────────────────────────────────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* ── Spacing ──────────────────────────────────────────────────── */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+  --sp-9: 48px;
+  --sp-10: 64px;
+
+  /* ── Animation ────────────────────────────────────────────────── */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+}

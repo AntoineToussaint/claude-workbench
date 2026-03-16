@@ -1,0 +1,234 @@
+/* ================================================================
+   Wizard — Setup wizard for first-run configuration
+   ================================================================ */
+
+.setup-wizard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--sp-5);
+}
+
+.setup-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  width: 480px;
+  padding: var(--sp-7);
+  box-shadow: var(--shadow-lg);
+  animation: scaleIn var(--duration-normal) var(--ease-out);
+}
+
+.setup-card h1 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+  text-align: center;
+  margin-bottom: var(--sp-5);
+}
+
+/* ── Progress dots ──────────────────────────────────────────────── */
+.setup-progress {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: var(--sp-6);
+}
+.setup-progress-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bg-overlay);
+  transition: all var(--duration-normal) var(--ease-out);
+}
+.setup-progress-dot.active {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ── Step content ───────────────────────────────────────────────── */
+.setup-step h2 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--sp-2);
+}
+.setup-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: var(--sp-4);
+  line-height: 1.5;
+}
+.setup-subtitle {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+.setup-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 10px;
+}
+
+/* ── Detection rows ─────────────────────────────────────────────── */
+.setup-detections {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--sp-3);
+}
+.setup-detection {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+.setup-detection:hover {
+  border-color: var(--border-medium);
+}
+.setup-detection-label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.setup-detection-value {
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* ── Warnings ───────────────────────────────────────────────────── */
+.setup-warnings {
+  margin-top: var(--sp-3);
+  padding: 10px 12px;
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-sm);
+}
+.setup-warning {
+  font-size: 11px;
+  color: var(--color-warning);
+  margin-bottom: 4px;
+}
+
+/* ── Color buttons ──────────────────────────────────────────────── */
+.setup-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.setup-color-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg-surface);
+  border: 2px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.setup-color-btn:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-elevated);
+}
+.setup-color-btn.active {
+  border-color: var(--color);
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  box-shadow: 0 0 12px -4px var(--color);
+}
+.setup-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* ── Terminal info ──────────────────────────────────────────────── */
+.setup-terminal-info {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.setup-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.setup-checkbox input {
+  cursor: pointer;
+}
+
+/* ── Editor buttons ─────────────────────────────────────────────── */
+.setup-editor-options {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.setup-editor-btn {
+  padding: 6px 14px;
+  background: var(--bg-surface);
+  border: 2px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.setup-editor-btn:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-elevated);
+}
+.setup-editor-btn.active {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  box-shadow: 0 0 12px -4px var(--accent);
+}
+
+/* ── Summary ────────────────────────────────────────────────────── */
+.setup-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--sp-3);
+}
+.setup-summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  border: 1px solid var(--border-subtle);
+}
+.setup-summary-row span:first-child {
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.setup-summary-row span:last-child {
+  color: var(--text-primary);
+}
+
+/* ── Wizard actions ─────────────────────────────────────────────── */
+.setup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: var(--sp-6);
+}
