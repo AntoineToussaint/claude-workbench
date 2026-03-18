@@ -1,9 +1,27 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { StatusBar } from "./StatusBar";
 import { EditTaskModal } from "./EditTaskModal";
 import { ICONS } from "../lib/icons";
 
-export function EnvCard({ color, env, launchers, status, multiRepo, onAssign, onRelease, onLaunch, onCreatePr, onUpdateTask }) {
+function areEqual(prev, next) {
+  return (
+    prev.color.name === next.color.name &&
+    prev.color.hex === next.color.hex &&
+    prev.env?.issue?.number === next.env?.issue?.number &&
+    prev.env?.issue?.title === next.env?.issue?.title &&
+    prev.env?.branch === next.env?.branch &&
+    prev.status?.claudeState === next.status?.claudeState &&
+    prev.status?.merged === next.status?.merged &&
+    prev.status?.pr?.url === next.status?.pr?.url &&
+    prev.status?.ahead === next.status?.ahead &&
+    prev.status?.changedFiles === next.status?.changedFiles &&
+    prev.status?.active === next.status?.active &&
+    prev.status?.ci === next.status?.ci &&
+    prev.multiRepo === next.multiRepo
+  );
+}
+
+export const EnvCard = memo(function EnvCard({ color, env, launchers, status, multiRepo, onAssign, onRelease, onLaunch, onUpdateTask, dragHandleProps }) {
   const merged = status?.merged;
   const [editing, setEditing] = useState(false);
   const labels = env?.issue?.labels ?? [];
@@ -14,12 +32,13 @@ export function EnvCard({ color, env, launchers, status, multiRepo, onAssign, on
 
   return (
     <div className={`env-card${merged ? " env-card-merged" : ""}`} style={{ "--card-color": cardColor, "--card-color-alpha": `${cardColor}30` }}>
-      <div className="env-header">
+      <div className="env-header" {...(dragHandleProps ?? {})} style={dragHandleProps ? { cursor: "grab" } : undefined}>
         <span className={`env-dot${isWorking ? " working" : ""}`} style={{ background: cardColor }} />
         <span className="env-name">{color.name}</span>
         {env && !merged && (
           <button
             className="release-btn"
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={() => onRelease(color.name)}
             title="Release slot"
           >
@@ -83,15 +102,6 @@ export function EnvCard({ color, env, launchers, status, multiRepo, onAssign, on
               </button>
             ))}
           </div>
-          {status?.active && !status.pr && (status.ahead > 0 || status.changedFiles > 0) && (
-            <button
-              className="pr-btn"
-              style={{ borderColor: color.hex, color: color.hex }}
-              onClick={() => onCreatePr(color.name)}
-            >
-              Create PR
-            </button>
-          )}
           {merged && (
             <button
               className="release-merged-btn"
@@ -122,4 +132,4 @@ export function EnvCard({ color, env, launchers, status, multiRepo, onAssign, on
       )}
     </div>
   );
-}
+}, areEqual);

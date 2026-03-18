@@ -29,12 +29,12 @@
     "start": "node server.js",
     "start:reset": "node server.js --reset",
     "dev:all": "node server.js & pnpm vite & wait",
+    "pretest": "npm rebuild better-sqlite3 --silent",
     "test": "vitest run",
     "prepublishOnly": "npm run build",
-    "electron:rebuild": "npx @electron/rebuild --only better-sqlite3 2>/dev/null || true",
-    "electron:stable": "npm run electron:rebuild && npm run build && electron .",
-    "electron:dev": "electron . --dev",
-    "electron:build": "npm run electron:rebuild && npm run build && electron-builder build --mac"
+    "electron:stable": "bash scripts/electron-run.sh",
+    "electron:dev": "bash scripts/electron-run.sh --dev",
+    "electron:build": "bash scripts/electron-run.sh --build"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -44,6 +44,9 @@
     "express": "^4.21.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3", "electron", "esbuild"]
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.4.1",

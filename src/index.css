@@ -98,45 +98,7 @@ body {
   position: relative;
 }
 
-/* Section drag handle (vertical reorder) */
-.section-drag-handle {
-  position: absolute;
-  left: -8px;
-  top: 6px;
-  width: 16px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  border-radius: 3px;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.project-section:hover .section-drag-handle { opacity: 1; }
-.section-drag-handle:hover { background: #1f1f1f; }
-.section-drag-handle:active { cursor: grabbing; }
-
-/* Card drag handle (horizontal reorder) */
-.sortable-card-wrapper { position: relative; }
-.card-drag-handle {
-  position: absolute;
-  top: 14px;
-  right: 8px;
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  border-radius: 3px;
-  opacity: 0;
-  transition: opacity 0.15s;
-  z-index: 2;
-}
-.sortable-card-wrapper:hover .card-drag-handle { opacity: 1; }
-.card-drag-handle:hover { background: #1f1f1f; }
-.card-drag-handle:active { cursor: grabbing; }
+/* Drag handles — see layout.css for styles */
 
 .project-header {
   display: flex;
@@ -394,7 +356,7 @@ body {
 .status-tag.ci-pending { background: #1a1200; color: #f59e0b; }
 .status-tag.claude-waiting { background: #1a2800; color: #a3e635; }
 .status-tag.claude-working { background: #1a1a3e; color: #818cf8; animation: pulse 1.5s ease-in-out infinite; }
-.status-tag.attention { background: #f59e0b; color: #000; font-weight: 700; font-size: 0.85em; padding: 3px 10px; text-transform: uppercase; letter-spacing: 0.5px; animation: pulse 1.5s ease-in-out infinite; }
+.status-tag.attention { background: rgba(245,158,11,0.15); color: #f59e0b; font-weight: 600; font-size: 9px; padding: 2px 6px; border: 1px solid rgba(245,158,11,0.3); border-radius: 3px; animation: pulse 1.5s ease-in-out infinite; }
 .status-tag.claude-shell { background: #1f1f1f; color: #888; }
 
 /* ── CI tooltip ──────────────────────────────────────────────────── */

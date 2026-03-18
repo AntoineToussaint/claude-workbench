@@ -1,6 +1,5 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ICONS } from "../lib/icons";
 
 export function SortableCard({ id, children }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
@@ -11,10 +10,7 @@ export function SortableCard({ id, children }) {
   };
   return (
     <div ref={setNodeRef} style={style} className="sortable-card-wrapper">
-      <div className="card-drag-handle" {...attributes} {...listeners}>
-        {ICONS.grip}
-      </div>
-      {children}
+      {typeof children === "function" ? children({ dragHandleProps: { ...attributes, ...listeners } }) : children}
     </div>
   );
 }

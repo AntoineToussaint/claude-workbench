@@ -1,6 +1,5 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ICONS } from "../lib/icons";
 
 export function SortableSection({ id, children }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
@@ -11,10 +10,7 @@ export function SortableSection({ id, children }) {
   };
   return (
     <section ref={setNodeRef} style={style} className="project-section">
-      <div className="section-drag-handle" {...attributes} {...listeners}>
-        {ICONS.grip}
-      </div>
-      {children}
+      {typeof children === "function" ? children({ dragHandleProps: { ...attributes, ...listeners } }) : children}
     </section>
   );
 }

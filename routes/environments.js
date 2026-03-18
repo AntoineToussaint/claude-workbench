@@ -1,17 +1,63 @@
 import { Router } from "express";
 import { exec } from "child_process";
-import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import { join, basename } from "path";
 import {
   getRepoById, listEnvironments, getEnvironment,
   upsertEnvironment, deleteEnvironment,
 } from "../db.js";
-import { loadConfig, COLORS } from "../lib/config.js";
+import { loadConfig, COLORS, colorForName } from "../lib/config.js";
 import { getGhRepo } from "../lib/github.js";
 import { getMultiplexer } from "../lib/multiplexer/index.js";
+import { tmuxSession } from "./launchers.js";
 import { getWebhookState } from "./webhooks.js";
+import { branchNameForIssue, injectIssueContext, cleanInjectedContext } from "../lib/environment.js";
 
 const router = Router();
+
+function parsePrData(pr) {
+  if (!pr?.number) return null;
+
+  const checks = pr.statusCheckRollup ?? [];
+  const reviews = pr.reviews ?? [];
+  const comments = pr.comments ?? [];
+  const reviewRequests = pr.reviewRequests ?? [];
+
+  // Determine review decision from latest review per author
+  const latestByAuthor = {};
+  for (const r of reviews) {
+    const author = r.author?.login ?? "unknown";
+    if (!latestByAuthor[author] || new Date(r.submittedAt) > new Date(latestByAuthor[author].submittedAt)) {
+      latestByAuthor[author] = r;
+    }
+  }
+  const latestReviews = Object.values(latestByAuthor);
+  const approved = latestReviews.filter(r => r.state === "APPROVED").length;
+  const changesRequested = latestReviews.filter(r => r.state === "CHANGES_REQUESTED").length;
+  const reviewDecision = changesRequested > 0 ? "CHANGES_REQUESTED" : approved > 0 ? "APPROVED" : reviewRequests.length > 0 ? "REVIEW_REQUIRED" : null;
+
+  return {
+    pr: {
+      number: pr.number, url: pr.url, state: pr.state,
+      title: pr.title, mergedAt: pr.mergedAt,
+      reviewDecision,
+      reviewers: latestReviews.map(r => ({ login: r.author?.login, state: r.state })),
+      pendingReviewers: reviewRequests.map(r => r.login ?? r.name ?? "unknown"),
+      commentCount: comments.length,
+    },
+    checks: {
+      total: checks.length,
+      pass: checks.filter(c => c.status === "COMPLETED" && c.conclusion === "SUCCESS").length,
+      fail: checks.filter(c => ["FAILURE", "TIMED_OUT", "CANCELLED"].includes(c.conclusion)).length,
+      pending: checks.filter(c => c.status !== "COMPLETED").length,
+      items: checks.map(c => ({
+        name: c.name || c.context,
+        status: c.conclusion || c.status || "PENDING",
+        url: c.detailsUrl || c.targetUrl,
+      })),
+    },
+  };
+}
 
 router.get("/environments", (_req, res) => {
   res.json(listEnvironments());
@@ -19,70 +65,108 @@ router.get("/environments", (_req, res) => {
 
 // ── Assign issue to environment ─────────────────────────────────────────────
 
-router.post("/environments/:color/assign", (req, res) => {
+router.post("/environments/:color/assign", async (req, res) => {
   const { color } = req.params;
   const { issue, repoId } = req.body;
   const repo = getRepoById(repoId);
   if (!repo) return res.status(400).json({ error: "No repo configured" });
 
+  // Kill any existing mux session for this color to prevent stealing
+  const existingEnv = getEnvironment(color);
+  if (existingEnv) {
+    try {
+      const config = loadConfig();
+      const muxLauncher = (config?.launchers ?? []).find(
+        (l) => l.type === "tmux-terminal" || l.type === "mux-terminal"
+      );
+      if (muxLauncher) {
+        const session = tmuxSession(muxLauncher.id, color);
+        const mux = await getMultiplexer();
+        const alive = await mux.hasSession(session);
+        if (alive) await mux.killSession(session);
+      }
+    } catch {}
+  }
+
   const repoName = basename(repo.repoDir);
   const envName = `${repoName}-${color}`;
-  const envPath = join(repo.workDir, envName);
-  const branchName = issue.custom
-    ? `task-${issue.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50)}`
-    : `issue-${issue.number}-${issue.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}`;
+  const branchName = branchNameForIssue(issue);
 
-  upsertEnvironment(color, { issue, repoId: repo.id, branch: branchName, path: envPath });
+  // Direct mode: use repo directory as-is, no worktrees or branches
+  if (repo.mode === "direct") {
+    const envPath = repo.repoDir;
+    upsertEnvironment(color, { issue, repoId: repo.id, branch: "", path: envPath });
+    injectIssueContext(envPath, issue, "");
+    return res.json({ ok: true, path: envPath, branch: "" });
+  }
+
+  const envPath = join(repo.workDir, envName);
+
+  // Helper: save to DB + inject context only after git operation succeeds
+  function finalize(branch, reused) {
+    upsertEnvironment(color, { issue, repoId: repo.id, branch, path: envPath });
+    injectIssueContext(envPath, issue, branch);
+    res.json({ ok: true, path: envPath, branch, reused: !!reused });
+  }
 
   if (repo.mode === "worktree") {
+    if (existsSync(envPath)) {
+      exec(`cd "${envPath}" && git rev-parse --abbrev-ref HEAD 2>/dev/null`, (err, stdout) => {
+        const currentBranch = (stdout ?? "").trim();
+        if (currentBranch === branchName) return finalize(branchName, true);
+        exec(`cd "${envPath}" && git checkout "${branchName}" 2>&1 || cd "${envPath}" && git checkout -b "${branchName}" 2>&1`, (err2, stdout2) => {
+          if (err2) console.warn(`Worktree branch switch: ${stdout2 || err2.message}`);
+          finalize(branchName, true);
+        });
+      });
+      return;
+    }
     const cmd = `cd "${repo.repoDir}" && git worktree add "${envPath}" -b "${branchName}" 2>&1 || git worktree add "${envPath}" "${branchName}" 2>&1`;
     exec(cmd, (err, stdout) => {
       if (err && !existsSync(envPath)) {
         return res.status(500).json({ error: stdout || err.message });
       }
-      injectIssueContext(envPath, issue, branchName);
-      res.json({ ok: true, path: envPath, branch: branchName });
+      finalize(branchName);
     });
   } else {
+    // Clone mode
     if (existsSync(envPath)) {
-      injectIssueContext(envPath, issue, branchName);
-      return res.json({ ok: true, path: envPath, branch: branchName, existed: true });
+      exec(`cd "${envPath}" && git rev-parse --abbrev-ref HEAD 2>/dev/null`, (err, stdout) => {
+        const currentBranch = (stdout ?? "").trim();
+        if (currentBranch === branchName) return finalize(branchName, true);
+        const cmd = `cd "${envPath}" && git fetch origin 2>&1 && (git checkout "${branchName}" 2>&1 || git checkout -b "${branchName}" 2>&1)`;
+        exec(cmd, (err2, stdout2) => {
+          if (err2) console.warn(`Clone mode branch setup: ${stdout2 || err2.message}`);
+          finalize(branchName, true);
+        });
+      });
+    } else {
+      // Determine clone source: prefer remote URL, fallback to local_dir, fallback to first existing sibling clone
+      let cloneSource = repo.repoDir;
+      exec(`git -C "${repo.repoDir}" rev-parse --is-inside-work-tree 2>/dev/null`, (_chkErr, chkOut) => {
+        if ((chkOut ?? "").trim() !== "true") {
+          if (repo.repo) {
+            cloneSource = repo.repo;
+          } else {
+            try {
+              const siblings = readdirSync(repo.workDir).filter(d => d.startsWith(repoName + "-"));
+              for (const s of siblings) {
+                const sp = join(repo.workDir, s);
+                if (existsSync(join(sp, ".git"))) { cloneSource = sp; break; }
+              }
+            } catch {}
+          }
+        }
+        const cmd = `git clone "${cloneSource}" "${envPath}" 2>&1 && cd "${envPath}" && (git checkout "${branchName}" 2>&1 || git checkout -b "${branchName}" 2>&1)`;
+        exec(cmd, (err, stdout) => {
+          if (err && !existsSync(envPath)) return res.status(500).json({ error: stdout || err.message });
+          finalize(branchName);
+        });
+      });
     }
-    const cmd = `git clone "${repo.repoDir}" "${envPath}" && cd "${envPath}" && git checkout -b "${branchName}" 2>&1`;
-    exec(cmd, (err, stdout) => {
-      if (err) return res.status(500).json({ error: stdout || err.message });
-      injectIssueContext(envPath, issue, branchName);
-      res.json({ ok: true, path: envPath, branch: branchName });
-    });
   }
 });
 
-function injectIssueContext(envPath, issue, branchName) {
-  const labels = (issue.labels ?? []).map((l) => l.name).join(", ");
-  const claudeMd = [
-    `# Current Task`,
-    ``,
-    `You are working on issue #${issue.number}: **${issue.title}**`,
-    issue.url ? `\nGitHub: ${issue.url}` : "",
-    labels ? `\nLabels: ${labels}` : "",
-    issue.body ? `\n## Issue Description\n\n${issue.body}` : "",
-    ``,
-    `## Instructions`,
-    ``,
-    `- Work on the branch \`${branchName}\``,
-    `- Focus on resolving this issue`,
-    `- Create atomic commits with clear messages`,
-    `- When done, let the user know so they can create a PR`,
-  ].filter(Boolean).join("\n");
-
-  const claudePath = join(envPath, "CLAUDE.md");
-  if (existsSync(claudePath)) {
-    const existing = readFileSync(claudePath, "utf-8");
-    writeFileSync(claudePath, existing + "\n\n" + claudeMd);
-  } else {
-    writeFileSync(claudePath, claudeMd);
-  }
-}
 
 // ── Update issue ────────────────────────────────────────────────────────────
 
@@ -107,7 +191,7 @@ router.get("/environments/:color/objective", (req, res) => {
   const env = getEnvironment(color);
   if (!env) return res.type("text").send("No environment assigned");
 
-  const colorDef = COLORS[color] ?? { hex: "#888888" };
+  const colorDef = colorForName(color);
   const rawMatches = colorDef.hex.replace("#", "").match(/\w{2}/g);
   const hexMatches = rawMatches?.length === 3 ? rawMatches : ["88", "88", "88"];
   const [r, g, b] = hexMatches.map((h) => parseInt(h, 16));
@@ -137,12 +221,26 @@ router.get("/environments/:color/objective", (req, res) => {
 
 // ── Release environment ─────────────────────────────────────────────────────
 
-router.post("/environments/:color/release", (req, res) => {
+router.post("/environments/:color/release", async (req, res) => {
   const { color } = req.params;
   const { removeWorktree } = req.body ?? {};
   const env = getEnvironment(color);
 
   if (env) {
+    // Kill the mux session (closes the terminal window)
+    try {
+      const config = loadConfig();
+      const muxLauncher = (config?.launchers ?? []).find(
+        (l) => l.type === "tmux-terminal" || l.type === "mux-terminal"
+      );
+      if (muxLauncher) {
+        const session = tmuxSession(muxLauncher.id, color);
+        const mux = await getMultiplexer();
+        const alive = await mux.hasSession(session);
+        if (alive) await mux.killSession(session);
+      }
+    } catch {}
+
     // Clean up injected "Current Task" section from CLAUDE.md
     cleanInjectedContext(env.path);
 
@@ -158,25 +256,6 @@ router.post("/environments/:color/release", (req, res) => {
   res.json({ ok: true });
 });
 
-function cleanInjectedContext(envPath) {
-  if (!envPath) return;
-  const claudePath = join(envPath, "CLAUDE.md");
-  if (!existsSync(claudePath)) return;
-  try {
-    const content = readFileSync(claudePath, "utf-8");
-    // Remove the injected "# Current Task" block and everything after it
-    const marker = "\n\n# Current Task";
-    const idx = content.indexOf(marker);
-    if (idx !== -1) {
-      const cleaned = content.slice(0, idx).trimEnd();
-      if (cleaned) {
-        writeFileSync(claudePath, cleaned + "\n");
-      } else {
-        unlinkSync(claudePath);
-      }
-    }
-  } catch {}
-}
 
 // ── Batched status (all environments) ────────────────────────────────────────
 
@@ -201,21 +280,26 @@ function fetchColorStatus(color, env, config, cb) {
   if (!env) return cb({ active: false });
 
   const ghRepo = getGhRepo(env.repoId);
-  const gitCmd = `cd "${env.path}" && git status --porcelain && echo "---BRANCH---" && (git rev-list --left-right --count origin/main...HEAD 2>/dev/null || git rev-list --left-right --count origin/master...HEAD 2>/dev/null || git rev-list --left-right --count main...HEAD 2>/dev/null || git rev-list --left-right --count master...HEAD 2>/dev/null || echo "0\t0")`;
-
-  const isBaseBranch = ["main", "master"].includes(env.branch);
-  const prCmd = ghRepo && !isBaseBranch
-    ? `gh pr view "${env.branch}" --repo "${ghRepo}" --json number,url,state,title,mergedAt,statusCheckRollup 2>/dev/null`
-    : null;
+  // Get actual current branch + git status in one shot
+  const gitCmd = `cd "${env.path}" && git rev-parse --abbrev-ref HEAD 2>/dev/null && echo "---GITSTATUS---" && git status --porcelain && echo "---BRANCH---" && (BASE=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/||') && git rev-list --left-right --count "$BASE"...HEAD 2>/dev/null || git rev-list --left-right --count origin/main...HEAD 2>/dev/null || git rev-list --left-right --count origin/master...HEAD 2>/dev/null || echo "0\t0")`;
 
   exec(gitCmd, (_err, gitOut) => {
-    const parts = (gitOut ?? "").split("---BRANCH---");
+    const output = gitOut ?? "";
+    const branchSplit = output.split("---GITSTATUS---");
+    const actualBranch = (branchSplit[0] ?? "").trim() || env.branch;
+    const rest = branchSplit[1] ?? "";
+    const parts = rest.split("---BRANCH---");
     const dirty = (parts[0] ?? "").trim().split("\n").filter(Boolean);
     const counts = (parts[1] ?? "0\t0").trim().split("\t");
 
+    const isBaseBranch = ["main", "master"].includes(actualBranch);
+    const prCmd = ghRepo && !isBaseBranch
+      ? `gh pr view "${actualBranch}" --repo "${ghRepo}" --json number,url,state,title,mergedAt,statusCheckRollup,reviews,comments,reviewRequests 2>/dev/null`
+      : null;
+
     const status = {
       active: true,
-      branch: env.branch,
+      branch: actualBranch,
       dirty: dirty.length > 0,
       changedFiles: dirty.length,
       behind: parseInt(counts[0]) || 0,
@@ -235,22 +319,8 @@ function fetchColorStatus(color, env, config, cb) {
       if (!prCmd) return cb(status);
       exec(prCmd, (_prErr, prOut) => {
         try {
-          const pr = JSON.parse(prOut ?? "{}");
-          if (pr.number) {
-            const checks = pr.statusCheckRollup ?? [];
-            status.pr = { number: pr.number, url: pr.url, state: pr.state, title: pr.title, mergedAt: pr.mergedAt };
-            status.checks = {
-              total: checks.length,
-              pass: checks.filter(c => c.status === "COMPLETED" && c.conclusion === "SUCCESS").length,
-              fail: checks.filter(c => ["FAILURE", "TIMED_OUT", "CANCELLED"].includes(c.conclusion)).length,
-              pending: checks.filter(c => c.status !== "COMPLETED").length,
-              items: checks.map(c => ({
-                name: c.name || c.context,
-                status: c.conclusion || c.status || "PENDING",
-                url: c.detailsUrl || c.targetUrl,
-              })),
-            };
-          }
+          const prData = parsePrData(JSON.parse(prOut ?? "{}"));
+          if (prData) { status.pr = prData.pr; status.checks = prData.checks; }
         } catch {}
         cb(status);
       });
@@ -263,9 +333,8 @@ function fetchColorStatus(color, env, config, cb) {
 
       mux.hasSession(session).then((alive) => {
         status.muxAlive = alive;
-        status.tmuxAlive = alive; // backward compat
+        status.tmuxAlive = alive;
         if (!alive) {
-          // If no session, try webhook state as fallback
           if (!capabilities.stateDetection) {
             const webhookState = getWebhookState(color);
             if (webhookState) status.claudeState = webhookState;
@@ -274,13 +343,11 @@ function fetchColorStatus(color, env, config, cb) {
         }
 
         if (!capabilities.stateDetection) {
-          // Use webhook-based state detection for non-tmux multiplexers
           const webhookState = getWebhookState(color);
           if (webhookState) status.claudeState = webhookState;
           return finish();
         }
 
-        // Capture pane content for state detection
         mux.capturePane(session, 0, 30).then((content) => {
           if (content) {
             const lines = content.split("\n").filter((l) => l.trim());
@@ -297,7 +364,6 @@ function fetchColorStatus(color, env, config, cb) {
               status.claudeState = "shell";
             }
           } else {
-            // capturePane returned null — try webhook fallback
             const webhookState = getWebhookState(color);
             if (webhookState) status.claudeState = webhookState;
           }
@@ -318,21 +384,25 @@ router.get("/environments/:color/status", (req, res) => {
   const ghRepo = getGhRepo(env.repoId);
   const config = loadConfig();
 
-  const gitCmd = `cd "${env.path}" && git status --porcelain && echo "---BRANCH---" && (git rev-list --left-right --count origin/main...HEAD 2>/dev/null || git rev-list --left-right --count origin/master...HEAD 2>/dev/null || git rev-list --left-right --count main...HEAD 2>/dev/null || git rev-list --left-right --count master...HEAD 2>/dev/null || echo "0\t0")`;
-
-  const isBaseBranch = ["main", "master"].includes(env.branch);
-  const prCmd = ghRepo && !isBaseBranch
-    ? `gh pr view "${env.branch}" --repo "${ghRepo}" --json number,url,state,title,mergedAt,statusCheckRollup 2>/dev/null`
-    : null;
+  const gitCmd = `cd "${env.path}" && git rev-parse --abbrev-ref HEAD 2>/dev/null && echo "---GITSTATUS---" && git status --porcelain && echo "---BRANCH---" && (BASE=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/||') && git rev-list --left-right --count "$BASE"...HEAD 2>/dev/null || git rev-list --left-right --count origin/main...HEAD 2>/dev/null || git rev-list --left-right --count origin/master...HEAD 2>/dev/null || echo "0\t0")`;
 
   exec(gitCmd, (_err, gitOut) => {
-    const parts = (gitOut ?? "").split("---BRANCH---");
+    const output = gitOut ?? "";
+    const branchSplit = output.split("---GITSTATUS---");
+    const actualBranch = (branchSplit[0] ?? "").trim() || env.branch;
+    const rest = branchSplit[1] ?? "";
+    const parts = rest.split("---BRANCH---");
     const dirty = (parts[0] ?? "").trim().split("\n").filter(Boolean);
     const counts = (parts[1] ?? "0\t0").trim().split("\t");
 
+    const isBaseBranch = ["main", "master"].includes(actualBranch);
+    const prCmd = ghRepo && !isBaseBranch
+      ? `gh pr view "${actualBranch}" --repo "${ghRepo}" --json number,url,state,title,mergedAt,statusCheckRollup,reviews,comments,reviewRequests 2>/dev/null`
+      : null;
+
     const status = {
       active: true,
-      branch: env.branch,
+      branch: actualBranch,
       dirty: dirty.length > 0,
       changedFiles: dirty.length,
       behind: parseInt(counts[0]) || 0,
@@ -351,22 +421,8 @@ router.get("/environments/:color/status", (req, res) => {
       if (!prCmd) return res.json(status);
       exec(prCmd, (_prErr, prOut) => {
         try {
-          const pr = JSON.parse(prOut ?? "{}");
-          if (pr.number) {
-            const checks = pr.statusCheckRollup ?? [];
-            status.pr = { number: pr.number, url: pr.url, state: pr.state, title: pr.title, mergedAt: pr.mergedAt };
-            status.checks = {
-              total: checks.length,
-              pass: checks.filter(c => c.status === "COMPLETED" && c.conclusion === "SUCCESS").length,
-              fail: checks.filter(c => ["FAILURE", "TIMED_OUT", "CANCELLED"].includes(c.conclusion)).length,
-              pending: checks.filter(c => c.status !== "COMPLETED").length,
-              items: checks.map(c => ({
-                name: c.name || c.context,
-                status: c.conclusion || c.status || "PENDING",
-                url: c.detailsUrl || c.targetUrl,
-              })),
-            };
-          }
+          const prData = parsePrData(JSON.parse(prOut ?? "{}"));
+          if (prData) { status.pr = prData.pr; status.checks = prData.checks; }
         } catch {}
         res.json(status);
       });

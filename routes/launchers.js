@@ -3,7 +3,7 @@ import { exec, spawn } from "child_process";
 import { writeFileSync } from "fs";
 import { basename, join } from "path";
 import { getRepoById, getEnvironment } from "../db.js";
-import { loadConfig, COLORS } from "../lib/config.js";
+import { loadConfig, COLORS, colorForName } from "../lib/config.js";
 import { detectPlatform, getTerminalSpawnArgs, getWindowFocusCommand, getClipboardCommand } from "../lib/platform.js";
 import { getMultiplexer } from "../lib/multiplexer/index.js";
 
@@ -19,6 +19,17 @@ function isAlive(key) {
 }
 
 export function tmuxSession(launcherId, color) { return `wb-${launcherId}-${color}`; }
+
+function resolveAppName(appPath) {
+  if (!appPath) return null;
+  const lower = appPath.toLowerCase();
+  if (lower.includes("ghostty")) return "Ghostty";
+  if (lower.includes("kitty")) return "kitty";
+  if (lower.includes("alacritty")) return "Alacritty";
+  if (lower.includes("iterm")) return "iTerm";
+  if (lower.includes("terminal.app")) return "Terminal";
+  return null;
+}
 
 function resolveEnvPath(color) {
   const env = getEnvironment(color);
@@ -66,7 +77,7 @@ router.post("/launch", async (req, res) => {
   try { envPath = resolveEnvPath(color); } catch (e) {
     return res.status(400).json({ error: e.message });
   }
-  const colorDef = COLORS[color] ?? { hex: "#888", bg: "#111" };
+  const colorDef = colorForName(color);
   const title = resolveTitle(color);
   const env = getEnvironment(color);
   const vars = { path: envPath, color, title, branch: env?.branch ?? "" };
@@ -117,14 +128,31 @@ async function launchMuxTerminal(launcher, color, envPath, colorDef, title, res)
         });
       });
       if (attached) {
-        // Terminal is still open — try to focus it
-        const pid = terminalPids[key];
-        const focusCmd = pid ? getWindowFocusCommand(pid) : null;
-        if (focusCmd) {
-          exec(focusCmd);
+        // Find the terminal window PID via: tmux client → login → terminal app
+        const termPid = await new Promise((resolve) => {
+          exec(`tmux list-clients -t ${session} -F "#{client_pid}" 2>/dev/null`, (err, stdout) => {
+            if (err || !stdout.trim()) return resolve(null);
+            const clientPid = stdout.trim().split("\n")[0];
+            // Walk up: tmux client → login → terminal app (grandparent)
+            exec(`/bin/ps -o ppid= -p ${clientPid}`, (e1, loginPid) => {
+              if (e1 || !loginPid.trim()) return resolve(null);
+              exec(`/bin/ps -o ppid= -p ${loginPid.trim()}`, (e2, appPid) => {
+                resolve(e2 ? null : appPid.trim() || null);
+              });
+            });
+          });
+        });
+
+        if (termPid && process.platform === "darwin") {
+          exec(`osascript -e 'tell application "System Events" to set frontmost of (first process whose unix id is ${termPid}) to true'`);
           return res.json({ ok: true, focused: true });
         }
-        // Can't focus (PID unknown) — reattach in a new terminal
+        // Fallback: activate the app generically
+        const appName = resolveAppName(launcher.app);
+        if (appName && process.platform === "darwin") {
+          exec(`open -a "${appName}"`);
+          return res.json({ ok: true, focused: true });
+        }
         spawnTerminalApp(launcher, session, color, colorDef, title, mux);
         return res.json({ ok: true, reattached: true });
       }

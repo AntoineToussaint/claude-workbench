@@ -1,8 +1,8 @@
 import express from "express";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { loadConfig, saveConfig, COLORS } from "./lib/config.js";
-import { listRepos, getSetting, setSetting } from "./db.js";
+import { loadConfig, saveConfig, COLORS, generateColor, colorForName } from "./lib/config.js";
+import { db, listRepos, listEnvironments as dbListEnvironments, getSetting, setSetting } from "./db.js";
 import repoRoutes from "./routes/repos.js";
 import envRoutes from "./routes/environments.js";
 import githubRoutes from "./routes/github.js";
@@ -48,12 +48,26 @@ app.get("/api/config", async (_req, res) => {
     ...COLORS[name],
   }));
 
-  // Auto-detect launchers if none configured
+  // Include dynamically-generated colors for active environments using non-predefined names
+  const activeEnvs = dbListEnvironments();
+  for (const colorName of Object.keys(activeEnvs)) {
+    if (!COLORS[colorName]) {
+      colors.push(colorForName(colorName));
+    }
+  }
+
+  // Auto-detect launchers if none configured or if any reference missing commands
   let { launchers } = config;
-  if (!launchers || launchers.length === 0) {
+  const needsRedetect = !launchers || launchers.length === 0 || launchers.some((l) => {
+    if (l.type === "command" && l.cmd) {
+      const bin = l.cmd.split(/\s/)[0];
+      return !commandExists(bin);
+    }
+    return false;
+  });
+  if (needsRedetect) {
     const defaults = generateDefaultConfig(detectPlatform());
     launchers = defaults.launchers;
-    // Persist so we don't re-detect every time
     saveConfig({ ...config, launchers });
   }
 
@@ -80,6 +94,12 @@ app.get("/api/setup/detect", (_req, res) => {
     missingDeps,
     multiplexer: muxType,
   });
+});
+
+app.post("/api/setup/reset", (_req, res) => {
+  // Remove config from settings to trigger setup wizard
+  db.prepare("DELETE FROM settings WHERE key = 'config'").run();
+  res.json({ ok: true });
 });
 
 app.post("/api/setup", (req, res) => {
@@ -115,6 +135,14 @@ app.put("/api/layout", (req, res) => {
   if (cardOrder !== undefined) setSetting("cardOrder", JSON.stringify(cardOrder));
   if (sectionOrder !== undefined) setSetting("sectionOrder", JSON.stringify(sectionOrder));
   res.json({ ok: true });
+});
+
+// ── Generate next available color ────────────────────────────────────────────
+
+app.post("/api/colors/next", (_req, res) => {
+  const usedColors = Object.keys(dbListEnvironments());
+  const newColor = generateColor(usedColors);
+  res.json(newColor);
 });
 
 // ── Route modules ───────────────────────────────────────────────────────────

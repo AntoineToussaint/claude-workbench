@@ -5,9 +5,9 @@ import { useState, useEffect, useRef, useMemo } from "react";
  *
  * Props:
  *   isOpen, onClose, environments, launchers,
- *   onLaunch, onCreatePr, onAssign, onShowSettings
+ *   onLaunch, onAssign, onShowSettings
  */
-export function CommandPalette({ isOpen, onClose, environments, launchers, onLaunch, onCreatePr, onAssign, onShowSettings }) {
+export function CommandPalette({ isOpen, onClose, environments, launchers, onLaunch, onAssign, onShowSettings }) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef(null);
@@ -33,15 +33,6 @@ export function CommandPalette({ isOpen, onClose, environments, launchers, onLau
         });
       }
 
-      // Create PR (only if active)
-      cmds.push({
-        id: `pr-${color}`,
-        icon: "pr",
-        title: `Create PR for ${color}`,
-        subtitle: env.issue?.title ?? env.branch,
-        section: "Environments",
-        action: () => onCreatePr(color),
-      });
     }
 
     // --- Global actions ---
@@ -72,11 +63,11 @@ export function CommandPalette({ isOpen, onClose, environments, launchers, onLau
       subtitle: "Dismiss all open panels",
       shortcut: "Esc",
       section: "Navigation",
-      action: () => {},
+      action: () => onClose(),
     });
 
     return cmds;
-  }, [environments, launchers, onLaunch, onCreatePr, onAssign, onShowSettings]);
+  }, [environments, launchers, onLaunch, onAssign, onShowSettings]);
 
   // Filter by query
   const filtered = useMemo(() => {

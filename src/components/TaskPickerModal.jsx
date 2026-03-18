@@ -6,7 +6,8 @@ export function TaskPickerModal({ issues, loading, onPick, onClose }) {
   const [customTitle, setCustomTitle] = useState("");
   const [customBody, setCustomBody] = useState("");
 
-  const filtered = issues.filter(
+  const safeIssues = Array.isArray(issues) ? issues : [];
+  const filtered = safeIssues.filter(
     (i) =>
       i.title.toLowerCase().includes(search.toLowerCase()) ||
       String(i.number).includes(search)

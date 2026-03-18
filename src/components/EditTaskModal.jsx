@@ -1,9 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 export function EditTaskModal({ env, onClose, onSave }) {
   const [title, setTitle] = useState(env.issue.title);
   const [body, setBody] = useState(env.issue.body ?? "");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   async function handleSave(e) {
     e.preventDefault();
@@ -13,7 +20,7 @@ export function EditTaskModal({ env, onClose, onSave }) {
     onClose();
   }
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal edit-issue-modal" onClick={(e) => e.stopPropagation()}>
         <h3>Edit Task</h3>
@@ -44,6 +51,7 @@ export function EditTaskModal({ env, onClose, onSave }) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

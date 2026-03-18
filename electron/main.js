@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, ipcMain } from "electron";
+import { app, BrowserWindow, Menu, ipcMain, Notification } from "electron";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { readFileSync, writeFileSync } from "fs";
@@ -104,6 +104,13 @@ app.whenReady().then(async () => {
     }
   });
 
+  // Native notifications IPC handler
+  ipcMain.on("show-notification", (_event, title, body) => {
+    if (Notification.isSupported()) {
+      new Notification({ title, body }).show();
+    }
+  });
+
   // Setapp integration (optional)
   try {
     const setapp = await import("@anthropic-ai/setapp-framework");
@@ -151,10 +158,14 @@ app.whenReady().then(async () => {
   }
 
   // macOS: re-create window when dock icon clicked
-  const lastUrl = mainWindow?.webContents?.getURL?.() ?? `http://localhost:${isDev ? 5173 : 3232}`;
+  let activeUrl = mainWindow?.webContents?.getURL?.() ?? `http://localhost:${isDev ? 5173 : 3232}`;
+  // Track the actual URL once the window loads
+  mainWindow?.webContents?.on("did-finish-load", () => {
+    activeUrl = mainWindow?.webContents?.getURL?.() ?? activeUrl;
+  });
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow(lastUrl);
+      createWindow(activeUrl);
     }
   });
 

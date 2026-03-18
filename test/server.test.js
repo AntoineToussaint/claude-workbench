@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { writeFileSync, mkdirSync, rmSync, existsSync, readFileSync } from "fs";
+import { writeFileSync, mkdirSync, rmSync, existsSync, readFileSync, statSync } from "fs";
+import { tmpdir } from "os";
 import { join } from "path";
 import { execSync } from "child_process";
 
@@ -73,11 +74,10 @@ describe("server", () => {
       expect(config.launchers).toHaveLength(2);
     });
 
-    it("should support both worktree and clone modes", () => {
-      const wt = writeConfig({ mode: "worktree" });
-      expect(wt.mode).toBe("worktree");
-      const cl = writeConfig({ mode: "clone" });
-      expect(cl.mode).toBe("clone");
+    it("should support worktree, clone, and direct modes", () => {
+      expect(writeConfig({ mode: "worktree" }).mode).toBe("worktree");
+      expect(writeConfig({ mode: "clone" }).mode).toBe("clone");
+      expect(writeConfig({ mode: "direct" }).mode).toBe("direct");
     });
   });
 
@@ -107,19 +107,10 @@ describe("server", () => {
   });
 
   describe("branch naming", () => {
-    it("should generate safe branch names from issue titles", () => {
-      // This mirrors the logic in the assign endpoint
-      const title = "Fix: weird bug with special chars! (urgent)";
-      const number = 123;
-      const branch = `issue-${number}-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}`;
-      expect(branch).toBe("issue-123-fix-weird-bug-with-special-chars-urgent-");
-      expect(branch).not.toMatch(/[^a-z0-9-]/);
-    });
-
-    it("should truncate long titles", () => {
-      const title = "A".repeat(100);
-      const branch = `issue-1-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}`;
-      expect(branch.length).toBeLessThanOrEqual(49); // "issue-1-" + 40 chars
+    // Branch naming logic is now tested in test/environment.test.js
+    // via the actual branchNameForIssue() function
+    it("placeholder — see test/environment.test.js for real tests", () => {
+      expect(true).toBe(true);
     });
   });
 
@@ -270,6 +261,99 @@ describe("server", () => {
 
       execSync(`git worktree remove "${wtPath}" --force`, { cwd: repoDir, stdio: "pipe" });
       expect(existsSync(wtPath)).toBe(false);
+    });
+  });
+
+  describe("repo modes", () => {
+    it("worktree mode: creates worktree from git repo", () => {
+      const repoDir = join(TEMP, "repo");
+      const envPath = join(TEMP, "repo-blue");
+      execSync(`git worktree add "${envPath}" -b test-wt`, { cwd: repoDir, stdio: "pipe" });
+
+      expect(existsSync(envPath)).toBe(true);
+      // Worktree has a .git file (not directory)
+      const gitPath = join(envPath, ".git");
+      expect(existsSync(gitPath)).toBe(true);
+      const stat = statSync(gitPath);
+      expect(stat.isFile()).toBe(true);
+
+      const branch = execSync("git branch --show-current", { cwd: envPath, encoding: "utf-8" }).trim();
+      expect(branch).toBe("test-wt");
+    });
+
+    it("clone mode: creates independent clone from git repo", () => {
+      const repoDir = join(TEMP, "repo");
+      const envPath = join(TEMP, "repo-clone-blue");
+      execSync(`git clone "${repoDir}" "${envPath}"`, { stdio: "pipe" });
+      execSync(`cd "${envPath}" && git checkout -b test-clone`, { stdio: "pipe" });
+
+      expect(existsSync(envPath)).toBe(true);
+      // Clone has a .git directory (not file)
+      const gitPath = join(envPath, ".git");
+      const stat = statSync(gitPath);
+      expect(stat.isDirectory()).toBe(true);
+
+      const branch = execSync("git branch --show-current", { cwd: envPath, encoding: "utf-8" }).trim();
+      expect(branch).toBe("test-clone");
+    });
+
+    it("clone mode: can clone from remote URL when local_dir is not a git repo", () => {
+      // Simulate: parent dir exists but isn't a git repo (like tensorzero setup)
+      const parentDir = join(tmpdir(), "wb-test-parent-" + Date.now());
+      mkdirSync(parentDir, { recursive: true });
+      try {
+        // parent is not a git repo
+        const isGit = (() => {
+          try {
+            execSync(`git -C "${parentDir}" rev-parse --is-inside-work-tree`, { stdio: "pipe" });
+            return true;
+          } catch { return false; }
+        })();
+        expect(isGit).toBe(false);
+
+        // But we can clone from a source repo
+        const sourceRepo = join(TEMP, "repo");
+        const envPath = join(parentDir, "env-blue");
+        execSync(`git clone "${sourceRepo}" "${envPath}"`, { stdio: "pipe" });
+        expect(existsSync(envPath)).toBe(true);
+
+        const branch = execSync("git branch --show-current", { cwd: envPath, encoding: "utf-8" }).trim();
+        expect(branch).toBeTruthy();
+      } finally {
+        rmSync(parentDir, { recursive: true, force: true });
+      }
+    });
+
+    it("direct mode: non-git directory used as-is", () => {
+      const plainDir = join(tmpdir(), "wb-test-plain-" + Date.now());
+      mkdirSync(plainDir, { recursive: true });
+      try {
+        writeFileSync(join(plainDir, "README.md"), "# No git here");
+
+        // Verify it's not a git repo (using a dir outside any git tree)
+        const isGit = (() => {
+          try {
+            execSync(`git -C "${plainDir}" rev-parse --is-inside-work-tree`, { stdio: "pipe" });
+            return true;
+          } catch { return false; }
+        })();
+        expect(isGit).toBe(false);
+
+        // Direct mode means we use the directory as-is — no branch, no worktree
+        expect(existsSync(plainDir)).toBe(true);
+        expect(readFileSync(join(plainDir, "README.md"), "utf-8")).toContain("No git here");
+      } finally {
+        rmSync(plainDir, { recursive: true, force: true });
+      }
+    });
+
+    it("config supports worktree, clone, and direct modes", () => {
+      const wt = writeConfig({ mode: "worktree" });
+      expect(wt.mode).toBe("worktree");
+      const cl = writeConfig({ mode: "clone" });
+      expect(cl.mode).toBe("clone");
+      const dr = writeConfig({ mode: "direct" });
+      expect(dr.mode).toBe("direct");
     });
   });
 

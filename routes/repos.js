@@ -54,13 +54,23 @@ router.post("/add-repo", (req, res) => {
     const folder = providedDir.trim().replace(/\/$/, "");
     const id = basename(folder);
     const workDir = dirname(folder);
-    exec(`git -C "${folder}" remote get-url origin 2>/dev/null`, (_gitErr, gitOut) => {
-      const url = (gitOut ?? "").trim();
-      try {
-        res.json(createRepo({ id, url, localDir: folder, workDir, mode: "worktree" }));
-      } catch (dbErr) {
-        res.status(400).json({ error: dbErr.message });
+    exec(`git -C "${folder}" rev-parse --is-inside-work-tree 2>/dev/null`, (_chkErr, chkOut) => {
+      const isGit = (chkOut ?? "").trim() === "true";
+      if (!isGit) {
+        try {
+          return res.json(createRepo({ id, url: "", localDir: folder, workDir, mode: "direct" }));
+        } catch (dbErr) {
+          return res.status(400).json({ error: dbErr.message });
+        }
       }
+      exec(`git -C "${folder}" remote get-url origin 2>/dev/null`, (_gitErr, gitOut) => {
+        const url = (gitOut ?? "").trim();
+        try {
+          res.json(createRepo({ id, url, localDir: folder, workDir, mode: "worktree" }));
+        } catch (dbErr) {
+          res.status(400).json({ error: dbErr.message });
+        }
+      });
     });
     return;
   }
@@ -74,13 +84,23 @@ router.post("/add-repo", (req, res) => {
     const id = basename(folder);
     const workDir = dirname(folder);
 
-    exec(`git -C "${folder}" remote get-url origin 2>/dev/null`, (_gitErr, gitOut) => {
-      const url = (gitOut ?? "").trim();
-      try {
-        res.json(createRepo({ id, url, localDir: folder, workDir, mode: "worktree" }));
-      } catch (dbErr) {
-        res.status(400).json({ error: dbErr.message });
+    exec(`git -C "${folder}" rev-parse --is-inside-work-tree 2>/dev/null`, (_chkErr, chkOut) => {
+      const isGit = (chkOut ?? "").trim() === "true";
+      if (!isGit) {
+        try {
+          return res.json(createRepo({ id, url: "", localDir: folder, workDir, mode: "direct" }));
+        } catch (dbErr) {
+          return res.status(400).json({ error: dbErr.message });
+        }
       }
+      exec(`git -C "${folder}" remote get-url origin 2>/dev/null`, (_gitErr, gitOut) => {
+        const url = (gitOut ?? "").trim();
+        try {
+          res.json(createRepo({ id, url, localDir: folder, workDir, mode: "worktree" }));
+        } catch (dbErr) {
+          res.status(400).json({ error: dbErr.message });
+        }
+      });
     });
   });
 });

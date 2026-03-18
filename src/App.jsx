@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   PointerSensor,
   KeyboardSensor,
@@ -23,7 +24,6 @@ import { SetupWizard } from "./components/SetupWizard";
 import { TaskPickerModal } from "./components/TaskPickerModal";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { RepoPickerModal } from "./components/RepoPickerModal";
-import { CreatePrModal } from "./components/CreatePrModal";
 import { SortableCard } from "./components/SortableCard";
 import { SortableSection } from "./components/SortableSection";
 import { ReleaseModal } from "./components/ReleaseModal";
@@ -47,19 +47,22 @@ function AppInner() {
   const [releaseColor, setReleaseColor] = useState(null);
   const [cardOrder, setCardOrder] = useState({});
   const [sectionOrder, setSectionOrder] = useState(null);
-  const [prProposal, setPrProposal] = useState(null);
   const [showPalette, setShowPalette] = useState(false);
+  const [connected, setConnected] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeDragId, setActiveDragId] = useState(null);
+  const [activeCardDrag, setActiveCardDrag] = useState(null);
   const pollRef = useRef(null);
   const abortRef = useRef(null);
+  const prevStatesRef = useRef({});
 
-  function closeAllModals() {
+  const closeAllModals = useCallback(() => {
     setShowPalette(false);
     setShowSettings(false);
     setPickerColor(null);
     setPickerRepoId(null);
     setReleaseColor(null);
-    setPrProposal(null);
-  }
+  }, []);
 
   useKeyboardShortcuts({
     "meta+k": () => setShowPalette((v) => !v),
@@ -79,6 +82,10 @@ function AppInner() {
       if (r.cardOrder) setCardOrder(r.cardOrder);
       if (r.sectionOrder) setSectionOrder(r.sectionOrder);
     });
+    // Request browser notification permission (no-op in Electron)
+    if (!window.electronAPI && Notification?.permission === "default") {
+      Notification.requestPermission();
+    }
   }, []);
 
   // Batched status polling with AbortController
@@ -91,6 +98,27 @@ function AppInner() {
       fetch("/api/environments/statuses", { signal: controller.signal })
         .then((r) => r.json())
         .then((data) => {
+          setConnected(true);
+          // Notify on state transitions to approval/waiting
+          for (const [color, s] of Object.entries(data)) {
+            const prev = prevStatesRef.current[color];
+            const title = s.claudeState === "approval" && prev !== "approval"
+              ? `${color}: Needs approval`
+              : s.claudeState === "waiting" && prev !== "waiting"
+              ? `${color}: Waiting for input`
+              : null;
+            if (title) {
+              const body = envs[color]?.issue?.title ?? "";
+              if (window.electronAPI?.showNotification) {
+                window.electronAPI.showNotification(title, body);
+              } else if (Notification?.permission === "granted") {
+                new Notification(title, { body });
+              }
+            }
+          }
+          prevStatesRef.current = Object.fromEntries(
+            Object.entries(data).map(([c, s]) => [c, s.claudeState])
+          );
           setStatuses(data);
           // Update dock badge with attention-needing count
           if (window.electronAPI?.setBadge) {
@@ -100,7 +128,9 @@ function AppInner() {
             window.electronAPI.setBadge(attentionCount);
           }
         })
-        .catch(() => {}); // aborted or network error — ignore
+        .catch((err) => {
+          if (err.name !== 'AbortError') setConnected(false);
+        });
     }
 
     pollStatuses();
@@ -114,11 +144,11 @@ function AppInner() {
   function fetchIssuesForRepo(repoId) {
     setIssuesLoading(true);
     api(`/github/issues?repo=${encodeURIComponent(repoId)}`)
-      .then(setIssues)
+      .then((data) => setIssues(Array.isArray(data) ? data : []))
       .finally(() => setIssuesLoading(false));
   }
 
-  function handleAssign(color) {
+  const handleAssign = useCallback((color) => {
     const repos = config?.repos ?? [];
     if (repos.length === 1) {
       setPickerColor(color);
@@ -128,15 +158,27 @@ function AppInner() {
       setPickerColor(color);
       setPickerRepoId(null);
     }
-  }
+  }, [config]);
 
-  function handleNewTask() {
+  const handleNewTask = useCallback(async () => {
     const colors = config?.colors ?? [];
     const used = new Set(Object.keys(envs));
     const free = colors.filter((c) => !used.has(c.name));
-    if (free.length === 0) return;
-    handleAssign(free[0].name);
-  }
+    if (free.length > 0) {
+      handleAssign(free[0].name);
+    } else {
+      // All colors used — generate a new one
+      const newColor = await api("/colors/next", { method: "POST" });
+      if (newColor.name) {
+        // Add to config so the UI knows about it
+        setConfig((prev) => ({
+          ...prev,
+          colors: [...(prev?.colors ?? []), newColor],
+        }));
+        handleAssign(newColor.name);
+      }
+    }
+  }, [config, envs, handleAssign]);
 
   function handlePickRepo(repoId) {
     setPickerRepoId(repoId);
@@ -148,19 +190,23 @@ function AppInner() {
     const repoId = pickerRepoId;
     setPickerColor(null);
     setPickerRepoId(null);
+    toast.info("Creating environment...", `${color}: ${issue.title}`);
     const result = await api(`/environments/${color}/assign`, {
       method: "POST",
       body: JSON.stringify({ issue, repoId }),
     });
     if (result.ok) {
+      toast.success("Environment ready", `${color}: ${issue.title}`);
       const updated = await api("/environments");
       if (!updated.error) setEnvs(updated);
+    } else {
+      toast.error("Failed to create environment", result.error ?? "Unknown error");
     }
   }
 
-  function handleRelease(color) {
+  const handleRelease = useCallback((color) => {
     setReleaseColor(color);
-  }
+  }, []);
 
   async function confirmRelease() {
     const color = releaseColor;
@@ -174,46 +220,21 @@ function AppInner() {
     if (!updated.error) setEnvs(updated);
   }
 
-  function handleLaunch(launcherId, color) {
+  const handleLaunch = useCallback((launcherId, color) => {
     api("/launch", {
       method: "POST",
       body: JSON.stringify({ launcherId, color }),
     });
-  }
+  }, []);
 
-  async function handleUpdateTask(color, updates) {
+  const handleUpdateTask = useCallback(async (color, updates) => {
     await api(`/environments/${color}/issue`, {
       method: "PATCH",
       body: JSON.stringify(updates),
     });
     const updated = await api("/environments");
     if (!updated.error) setEnvs(updated);
-  }
-
-  async function handleCreatePr(color) {
-    const proposal = await api(`/environments/${color}/propose-pr`, { method: "POST" });
-    if (proposal.error) return toast.error("PR proposal failed", proposal.error);
-    setPrProposal({ color, ...proposal });
-  }
-
-  async function handleSubmitPr({ branch, title, body }) {
-    const color = prProposal.color;
-    const result = await api(`/environments/${color}/create-pr`, {
-      method: "POST",
-      body: JSON.stringify({ branch, title, body }),
-    });
-    setPrProposal(null);
-    if (result.ok) {
-      toast.success("PR created", result.output);
-      // Refresh status for this color
-      const s = await api(`/environments/${color}/status`);
-      if (!s.error) setStatuses((prev) => ({ ...prev, [color]: s }));
-      const updated = await api("/environments");
-      if (!updated.error) setEnvs(updated);
-    } else {
-      toast.error("PR creation failed", result.error);
-    }
-  }
+  }, []);
 
   // ── DnD handlers ──────────────────────────────────────────────────────────
 
@@ -346,6 +367,19 @@ function AppInner() {
     envsByRepo[rid].push({ color, env, colorDef: config.colors.find((c) => c.name === color) });
   }
 
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    for (const [rid, repoEnvs] of Object.entries(envsByRepo)) {
+      envsByRepo[rid] = repoEnvs.filter(({ color, env }) =>
+        color.toLowerCase().includes(q) ||
+        (env?.issue?.title ?? "").toLowerCase().includes(q) ||
+        (env?.branch ?? "").toLowerCase().includes(q) ||
+        (env?.issue?.body ?? "").toLowerCase().includes(q)
+      );
+      if (envsByRepo[rid].length === 0) delete envsByRepo[rid];
+    }
+  }
+
   function envsByRepoColors(repoId) {
     return (envsByRepo[repoId] ?? []).map((e) => e.color);
   }
@@ -372,44 +406,84 @@ function AppInner() {
     : repos;
 
   const usedColors = new Set(Object.keys(envs));
-  const freeColors = config.colors.filter((c) => !usedColors.has(c.name));
+  const freeColors = (config.colors ?? []).filter((c) => !usedColors.has(c.name));
 
   return (
     <div className="app">
+      {!connected && <div className="reconnecting-banner">Reconnecting to server...</div>}
       <header className="app-header">
+        <span className={`connection-dot ${connected ? 'connected' : 'disconnected'}`} title={connected ? 'Connected' : 'Connection lost'} />
         <h1>Claude Workbench</h1>
+        <input
+          className="header-search"
+          type="text"
+          placeholder="Filter tasks..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
         <button className="settings-btn" onClick={() => setShowSettings(true)} title="Manage projects">
           + Project
         </button>
+        {window.location.port === "5173" && (
+          <button
+            className="settings-btn"
+            style={{ color: "var(--color-danger)", borderColor: "var(--color-danger)" }}
+            onClick={async () => {
+              await api("/config", { method: "PUT", body: JSON.stringify({ _reset: true }) });
+              // Wipe config to trigger onboarding
+              await fetch("/api/setup/reset", { method: "POST" });
+              setConfig({ setupRequired: true });
+            }}
+            title="Reset to onboarding (dev only)"
+          >
+            Reset
+          </button>
+        )}
       </header>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={(e) => setActiveDragId(e.active.id)} onDragEnd={(e) => { setActiveDragId(null); handleSectionDragEnd(e); }}>
         <SortableContext items={orderedRepos.map((r) => r.id)} strategy={verticalListSortingStrategy}>
           <main className="board-sections">
             {orderedRepos.map((repo) => {
               const repoEnvs = envsByRepo[repo.id] ?? [];
               const cardIds = repoEnvs.map((e) => e.color);
+              // Hide empty repos when filtering (but always show when not filtering)
+              if (searchQuery && repoEnvs.length === 0) return null;
               return (
                 <SortableSection key={repo.id} id={repo.id}>
-                  <div className="project-header">
-                    {freeColors.length > 0 && (
+                  {({ dragHandleProps }) => (<>
+                  <div className="project-header" {...dragHandleProps} style={{ cursor: "grab" }}>
                       <button
                         className="new-task-btn"
-                        style={{ borderColor: freeColors[0].hex, color: freeColors[0].hex }}
-                        onClick={() => {
-                          setPickerColor(freeColors[0].name);
+                        style={{ borderColor: freeColors[0]?.hex ?? "#888", color: freeColors[0]?.hex ?? "#888" }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={async () => {
+                          let color;
+                          if (freeColors.length > 0) {
+                            color = freeColors[0].name;
+                          } else {
+                            // Generate a new color slot
+                            const newColor = await api("/colors/next", { method: "POST" });
+                            if (!newColor.name) return toast.error("Failed to generate color");
+                            setConfig((prev) => ({
+                              ...prev,
+                              colors: [...(prev?.colors ?? []), newColor],
+                            }));
+                            color = newColor.name;
+                          }
+                          setPickerColor(color);
                           setPickerRepoId(repo.id);
                           fetchIssuesForRepo(repo.id);
                         }}
                       >
                         +
                       </button>
-                    )}
                     <span className="project-name">{repo.id}</span>
                     {repo.repo && <span className="project-url">{repo.repo.split("/").slice(-2).join("/")}</span>}
                     <span className="project-env-count">{repoEnvs.length}</span>
                     <button
                       className="project-delete-btn"
                       title="Remove project"
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={async () => {
                         if (!(await confirm("Remove project?", `Remove project "${repo.id}"? This will release all its environments.`, { confirmText: "Remove", danger: true }))) return;
                         await api(`/repos/${encodeURIComponent(repo.id)}`, { method: "DELETE" });
@@ -420,17 +494,20 @@ function AppInner() {
                       ×
                     </button>
                   </div>
-                  {repoEnvs.length > 0 && (
+                  {repoEnvs.length > 0 ? (
                     <DndContext
                       sensors={sensors}
                       collisionDetection={closestCenter}
-                      onDragEnd={(event) => handleCardDragEnd(repo.id, event)}
+                      onDragStart={(e) => setActiveCardDrag(e.active.id)}
+                      onDragEnd={(event) => { setActiveCardDrag(null); handleCardDragEnd(repo.id, event); }}
                     >
                       <SortableContext items={cardIds} strategy={horizontalListSortingStrategy}>
                         <div className="project-envs">
                           {repoEnvs.map(({ color, env, colorDef }) => (
                             <SortableCard key={color} id={color}>
+                              {({ dragHandleProps: cardDragProps }) => (
                               <EnvCard
+                                dragHandleProps={cardDragProps}
                                 color={colorDef ?? { name: color, hex: "#888", bg: "#111" }}
                                 env={env}
                                 status={statuses[color]}
@@ -439,20 +516,61 @@ function AppInner() {
                                 onAssign={handleAssign}
                                 onRelease={handleRelease}
                                 onLaunch={handleLaunch}
-                                onCreatePr={handleCreatePr}
                                 onUpdateTask={handleUpdateTask}
                               />
+                              )}
                             </SortableCard>
                           ))}
                         </div>
                       </SortableContext>
+                      <DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>
+                        {activeCardDrag ? (() => {
+                          const cd = (config.colors ?? []).find((c) => c.name === activeCardDrag);
+                          const cardEnv = envs[activeCardDrag];
+                          return (
+                            <div className="env-card" style={{ "--card-color": cd?.hex ?? "#888", "--card-color-alpha": `${cd?.hex ?? "#888"}30`, cursor: "grabbing", boxShadow: "var(--shadow-lg)" }}>
+                              <div className="env-header">
+                                <span className="env-dot" style={{ background: cd?.hex ?? "#888" }} />
+                                <span className="env-name">{activeCardDrag}</span>
+                              </div>
+                              {cardEnv?.issue && (
+                                <div className="env-body" style={{ padding: "8px 16px" }}>
+                                  <span className="env-task-title">{cardEnv.issue.title}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })() : null}
+                      </DragOverlay>
                     </DndContext>
+                  ) : (
+                    <div className="project-empty">No active tasks — click + to assign one</div>
                   )}
+                  </>)}
                 </SortableSection>
               );
             })}
+            {searchQuery && Object.keys(envsByRepo).length === 0 && (
+              <div className="search-empty">No tasks matching "{searchQuery}"</div>
+            )}
           </main>
         </SortableContext>
+        <DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>
+          {activeDragId ? (() => {
+            const repo = repos.find((r) => r.id === activeDragId);
+            if (repo) {
+              const count = (envsByRepo[repo.id] ?? []).length;
+              return (
+                <div className="project-header drag-overlay" style={{ cursor: "grabbing", background: "var(--bg-surface)", border: "1px solid var(--border-medium)", borderRadius: "var(--radius-sm)", padding: "8px 16px", boxShadow: "var(--shadow-lg)" }}>
+                  <span className="project-name">{repo.id}</span>
+                  {repo.repo && <span className="project-url">{repo.repo.split("/").slice(-2).join("/")}</span>}
+                  <span className="project-env-count">{count}</span>
+                </div>
+              );
+            }
+            return null;
+          })() : null}
+        </DragOverlay>
       </DndContext>
       {pickerColor && !pickerRepoId && repos.length > 1 && (
         <RepoPickerModal
@@ -477,20 +595,12 @@ function AppInner() {
           onConfirm={confirmRelease}
         />
       )}
-      {prProposal && (
-        <CreatePrModal
-          proposal={prProposal}
-          onClose={() => setPrProposal(null)}
-          onSubmit={handleSubmitPr}
-        />
-      )}
       <CommandPalette
         isOpen={showPalette}
         onClose={() => setShowPalette(false)}
         environments={envs}
         launchers={launchers}
         onLaunch={handleLaunch}
-        onCreatePr={handleCreatePr}
         onAssign={handleNewTask}
         onShowSettings={() => setShowSettings(true)}
       />
@@ -501,6 +611,9 @@ function AppInner() {
           onReposChanged={() => { api("/config").then((r) => !r.error && setConfig(r)); api("/environments").then((r) => !r.error && setEnvs(r)); }}
         />
       )}
+      <footer className="app-footer">
+        <span>Built {new Date(__BUILD_TIME__).toLocaleString()}</span>
+      </footer>
     </div>
   );
 }

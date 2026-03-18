@@ -5,3 +5,4 @@ workbench.db
 workbench.db-wal
 workbench.db-shm
 state.json
+.electron-cache/

@@ -84,15 +84,36 @@ describe("platform detection", () => {
   });
 
   describe("getTerminalSpawnArgs", () => {
-    it("should return ghostty config with configFile in cache dir", () => {
+    it("should return ghostty spawn args with correct options", () => {
       const result = getTerminalSpawnArgs("ghostty", "/usr/bin/ghostty", "wb-test-blue", "Test", "#001122", true, "/bin/zsh");
       expect(result).not.toBeNull();
-      expect(result.bin).toBe("/usr/bin/ghostty");
-      expect(result.args[0]).toContain("--config-file=");
-      expect(result.configFile).toContain(".cache/claude-workbench/");
-      expect(result.configFile).toContain("wb-test-blue.conf");
-      expect(result.configContent).toContain("background = #001122");
-      expect(result.configContent).toContain("fullscreen = true");
+      if (process.platform === "darwin") {
+        // macOS: uses `open -na Ghostty.app --args`
+        expect(result.bin).toBe("open");
+        expect(result.args).toContain("-na");
+        expect(result.args).toContain("Ghostty.app");
+        expect(result.args).toContain("--args");
+        expect(result.args.some(a => a.includes("--background=#001122"))).toBe(true);
+        expect(result.args.some(a => a.includes("--fullscreen=true"))).toBe(true);
+        expect(result.args.some(a => a.includes("--command="))).toBe(true);
+        expect(result.args.some(a => a.includes("tmux attach"))).toBe(true);
+        expect(result.args.some(a => a.includes("--keybind=super+n=unbind"))).toBe(true);
+      } else {
+        // Linux: uses config file
+        expect(result.bin).toBe("/usr/bin/ghostty");
+        expect(result.args[0]).toContain("--config-file=");
+        expect(result.configContent).toContain("background = #001122");
+        expect(result.configContent).toContain("fullscreen = true");
+      }
+    });
+
+    it("ghostty without fullscreen should not include fullscreen args", () => {
+      const result = getTerminalSpawnArgs("ghostty", "/usr/bin/ghostty", "wb-test-blue", "Test", "#001122", false, "/bin/zsh");
+      if (process.platform === "darwin") {
+        expect(result.args.some(a => a.includes("--fullscreen"))).toBe(false);
+      } else {
+        expect(result.configContent).not.toContain("fullscreen");
+      }
     });
 
     it("should return kitty args", () => {
@@ -137,7 +158,7 @@ describe("platform detection", () => {
     it("should only include macos-non-native-fullscreen on darwin", () => {
       const result = getTerminalSpawnArgs("ghostty", "/usr/bin/ghostty", "wb-test-blue", "Test", "#001122", true, "/bin/bash");
       if (process.platform === "darwin") {
-        expect(result.configContent).toContain("macos-non-native-fullscreen");
+        expect(result.args.some(a => a.includes("macos-non-native-fullscreen"))).toBe(true);
       } else {
         expect(result.configContent).not.toContain("macos-non-native-fullscreen");
       }
