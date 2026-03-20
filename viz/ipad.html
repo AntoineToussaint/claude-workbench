@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>NEXUS — iPad</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#06060c;--bg2:#0a0a14;--sf:#0f0f1a;--sf2:#151525;--sf3:#1a1a2e;
+  --b1:#1e1e35;--b2:#2a2a45;
+  --t1:#e4e4f0;--t2:#7878a0;--t3:#4a4a6a;
+  --ac:#6366f1;--ac2:#818cf8;--ac3:#a5b4fc;
+  --g:#22c55e;--g2:#4ade80;--r:#ef4444;--r2:#f87171;
+  --y:#eab308;--y2:#facc15;--o:#f97316;--c:#22d3ee;--p:#a855f7;--pk:#ec4899;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--t1);font-family:'Inter',system-ui,sans-serif}
+
+/* ── App shell ── */
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+.safe-top{height:env(safe-area-inset-top);background:var(--bg2);flex-shrink:0}
+
+/* ── Tab bar (bottom) ── */
+.tab-bar{
+  display:flex;padding:8px 0 calc(8px + env(safe-area-inset-bottom));
+  background:var(--sf);border-top:1px solid var(--b1);flex-shrink:0;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+}
+.tab{flex:1;text-align:center;padding:6px 0;cursor:pointer;position:relative}
+.tab-icon{font-size:22px;margin-bottom:2px;display:block}
+.tab-label{font-size:10px;font-weight:500;color:var(--t3)}
+.tab.active .tab-label{color:var(--ac2)}
+.tab.active .tab-icon{color:var(--ac2)}
+.tab .tab-icon{color:var(--t3)}
+.tab-badge{
+  position:absolute;top:2px;right:calc(50% - 18px);
+  width:18px;height:18px;border-radius:9px;background:var(--r);
+  color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;
+}
+
+/* ── Screens ── */
+.screen{display:none;flex:1;overflow:hidden;flex-direction:column}
+.screen.active{display:flex}
+.screen-header{
+  padding:16px 20px 12px;background:var(--bg2);flex-shrink:0;
+  border-bottom:1px solid var(--b1);
+}
+.screen-header h1{font-size:28px;font-weight:800;letter-spacing:-0.5px}
+.screen-header .sub{font-size:13px;color:var(--t2);margin-top:2px}
+.screen-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 20px 20px}
+
+/* ── Glass card ── */
+.glass{
+  background:linear-gradient(135deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02));
+  border:1px solid rgba(255,255,255,0.07);border-radius:16px;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+
+/* ── System pulse ── */
+.sys-pulse{
+  display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;
+  background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.1);margin-bottom:16px;
+}
+.pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--g);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(34,197,94,0.3)}50%{opacity:.7;box-shadow:0 0 0 6px rgba(34,197,94,0)}}
+.pulse-text{font-size:12px;color:var(--g)}
+.pulse-text span{display:block;color:var(--t2);font-size:11px;margin-top:1px}
+
+/* ── Streaming bar ── */
+.stream{height:2px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--ac),var(--ac2),transparent);background-size:200% 100%;animation:stream 2s linear infinite}
+@keyframes stream{0%{background-position:-200% 0}100%{background-position:200% 0}}
+
+/* ── Badge ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600}
+.badge-run{background:rgba(99,102,241,0.12);color:var(--ac2)}
+.badge-wait{background:rgba(234,179,8,0.12);color:var(--y)}
+.badge-done{background:rgba(34,197,94,0.12);color:var(--g)}
+.badge-err{background:rgba(239,68,68,0.12);color:var(--r)}
+.badge-canary{background:rgba(234,179,8,0.1);color:var(--y)}
+
+/* ── Progress dots ── */
+.dots{display:flex;gap:4px;align-items:center}
+.dot{width:8px;height:8px;border-radius:50%}
+.dot-done{background:var(--g)}.dot-act{background:var(--ac2);animation:pulse 1.5s infinite}
+.dot-idle{background:var(--b1)}.dot-warn{background:var(--y)}
+
+/* ════════════════════════════════════════════ */
+/*  SCREEN: MAP                                */
+/* ════════════════════════════════════════════ */
+.map-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.svc-card{padding:16px;position:relative;overflow:hidden}
+.svc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.svc-card.healthy::before{background:var(--g)}
+.svc-card.canary-state::before{background:linear-gradient(90deg,var(--y),var(--o))}
+.svc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.svc-name{font-size:15px;font-weight:600}
+.svc-ver{font-size:11px;color:var(--t2);margin-top:2px}
+.svc-pill{font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px}
+.svc-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+.m{background:var(--bg2);border-radius:8px;padding:7px 8px}
+.m-label{font-size:9px;color:var(--t3);margin-bottom:1px}
+.m-val{font-size:15px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.m-val.good{color:var(--g)}.m-val.warn{color:var(--y)}.m-val.bad{color:var(--r)}
+.m-delta{font-size:9px;color:var(--t3)}
+
+.spark{width:100%;height:32px;background:var(--bg2);border-radius:6px;overflow:hidden;position:relative;margin-bottom:8px}
+.spark svg{width:100%;height:100%}
+.spark-mark{position:absolute;top:0;bottom:0;width:1px;background:var(--y);opacity:.5}
+.spark-tag{position:absolute;top:2px;font-size:8px;color:var(--y);transform:translateX(-50%);white-space:nowrap}
+
+.canary-box{padding:10px;border-radius:8px;background:rgba(234,179,8,0.04);border:1px solid rgba(234,179,8,0.1);margin-top:8px}
+.canary-head{display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px}
+.canary-title{font-weight:600;color:var(--y)}
+.canary-time{color:var(--t3);font-family:'JetBrains Mono',monospace}
+.canary-bar{height:5px;background:var(--bg);border-radius:3px;overflow:hidden;margin-bottom:4px}
+.canary-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--y),var(--o));background-size:200% 100%;animation:canaryPulse 2s linear infinite}
+@keyframes canaryPulse{0%{background-position:0% 0}100%{background-position:200% 0}}
+.canary-stages{display:flex;justify-content:space-between;font-size:9px;color:var(--t3)}
+.canary-stages .on{color:var(--y);font-weight:600}
+.canary-stages .past{color:var(--g)}
+
+.agents-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.agent-chip{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:10px;background:var(--bg2);color:var(--t2)}
+.agent-dot{width:5px;height:5px;border-radius:50%}
+
+/* Locks */
+.locks{padding:16px;margin-bottom:16px}
+.locks-title{font-size:13px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.locks-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.lock{padding:10px;border-radius:8px;background:var(--bg2);border-left:3px solid var(--b1)}
+.lock.ex{border-left-color:var(--r)}.lock.sh{border-left-color:var(--ac)}.lock.q{border-left-color:var(--y);opacity:.7}
+.lock-scope{font-size:11px;font-weight:600;font-family:'JetBrains Mono',monospace;margin-bottom:2px}
+.lock-owner{font-size:10px;color:var(--t2)}
+.lock-type{font-size:9px;margin-top:2px}
+
+/* ════════════════════════════════════════════ */
+/*  SCREEN: OBJECTIVES                         */
+/* ════════════════════════════════════════════ */
+.obj-section{margin-bottom:20px}
+.obj-section-title{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.obj-section-count{font-size:10px;padding:1px 6px;border-radius:4px;background:var(--sf2);color:var(--t2)}
+.obj-card{padding:14px;margin-bottom:10px;cursor:pointer;transition:transform .15s;-webkit-user-select:none}
+.obj-card:active{transform:scale(.98)}
+.obj-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.obj-title{font-size:15px;font-weight:600}
+.obj-agents{font-size:11px;color:var(--t2);margin-bottom:8px}
+.obj-bar{height:4px;background:var(--bg);border-radius:2px;overflow:hidden;margin-bottom:8px}
+.obj-fill{height:100%;border-radius:2px}
+.obj-children{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.04)}
+.obj-child{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px}
+.obj-child-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.obj-child-name{flex:1;color:var(--t2)}
+.obj-child-st{font-size:11px}
+.obj-dep{margin-top:8px;padding:8px 10px;border-radius:6px;background:rgba(234,179,8,0.04);border:1px solid rgba(234,179,8,0.08);font-size:11px;color:var(--y)}
+
+/* ════════════════════════════════════════════ */
+/*  SCREEN: FOCUS                              */
+/* ════════════════════════════════════════════ */
+.focus-back{font-size:13px;color:var(--ac2);margin-bottom:4px;cursor:pointer}
+.focus-crumb{font-size:12px;color:var(--t2);margin-bottom:16px}
+.focus-crumb span{color:var(--ac2);cursor:pointer}
+
+.section-title{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;margin-top:16px}
+
+.focus-agents{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.fa{padding:12px;border-radius:10px;background:var(--sf);border:1px solid var(--b1)}
+.fa-head{display:flex;justify-content:space-between;margin-bottom:4px}
+.fa-name{font-size:13px;font-weight:600}
+.fa-st{font-size:12px;color:var(--t2);margin-bottom:4px}
+.fa-detail{font-size:10px;color:var(--t3)}
+
+.deploy-box{padding:14px;border-radius:12px;background:var(--sf);border:1px solid var(--b1)}
+.deploy-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.deploy-title{font-size:14px;font-weight:600}
+.deploy-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.dm{text-align:center}
+.dm-label{font-size:10px;color:var(--t3);margin-bottom:1px}
+.dm-val{font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.dm-delta{font-size:10px}
+.deploy-btns{display:flex;gap:8px}
+.deploy-btn{
+  flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:600;
+  border:1px solid var(--b1);background:var(--sf2);color:var(--t1);
+  cursor:pointer;text-align:center;transition:transform .1s;
+}
+.deploy-btn:active{transform:scale(.97)}
+.deploy-btn.primary{background:var(--g);border-color:var(--g);color:#000}
+.deploy-btn.danger{background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.2);color:var(--r)}
+
+.scope-locks{display:flex;flex-direction:column;gap:6px}
+.sl{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:var(--bg2);font-size:12px}
+.sl-path{font-family:'JetBrains Mono',monospace;flex:1}
+.sl-type{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px}
+.sl-type.w{background:rgba(239,68,68,0.1);color:var(--r)}
+.sl-type.r{background:rgba(99,102,241,0.1);color:var(--ac2)}
+
+.artifacts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.art{padding:10px;border-radius:8px;background:var(--sf);border:1px solid var(--b1);cursor:pointer;transition:border-color .15s}
+.art:active{border-color:var(--ac)}
+.art-name{font-size:11px;font-weight:600;font-family:'JetBrains Mono',monospace;margin-bottom:2px}
+.art-detail{font-size:10px;color:var(--t2)}
+
+.timeline{margin-top:8px}
+.tl{padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.03);display:flex;gap:10px}
+.tl-time{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;min-width:36px;padding-top:2px}
+.tl-body{flex:1;font-size:13px}
+.tl-body strong{font-weight:600}
+.tl-actions{display:flex;gap:6px;margin-top:8px}
+.tl-btn{
+  padding:8px 16px;border-radius:8px;font-size:12px;font-weight:500;
+  border:1px solid var(--b1);background:var(--sf2);color:var(--t1);cursor:pointer;
+}
+.tl-btn:active{transform:scale(.97)}
+.tl-btn.primary{background:var(--ac);border-color:var(--ac)}
+
+/* ════════════════════════════════════════════ */
+/*  SCREEN: INBOX (swipe cards)                */
+/* ════════════════════════════════════════════ */
+.inbox-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+.inbox-stack{width:100%;max-width:560px;position:relative;margin-bottom:20px}
+.inbox-bg{position:absolute;width:100%;border-radius:20px;background:var(--sf2);border:1px solid var(--b1)}
+.inbox-bg:nth-child(1){height:180px;top:16px;transform:scale(.94);opacity:.3}
+.inbox-bg:nth-child(2){height:180px;top:8px;transform:scale(.97);opacity:.5}
+.inbox-front{
+  position:relative;border-radius:20px;padding:24px;
+  background:var(--sf);border:1px solid var(--b2);
+  box-shadow:0 16px 48px rgba(0,0,0,0.4);
+  transition:transform .3s,opacity .3s;
+  touch-action:pan-y;
+}
+.inbox-front.swipe-left{transform:translateX(-120%) rotate(-8deg);opacity:0}
+.inbox-front.swipe-right{transform:translateX(120%) rotate(8deg);opacity:0}
+.inbox-type-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;margin-bottom:10px}
+.inbox-type-badge.deploy{background:rgba(234,179,8,0.1);color:var(--y)}
+.inbox-type-badge.arch{background:rgba(168,85,247,0.1);color:var(--p)}
+.inbox-type-badge.conflict{background:rgba(239,68,68,0.1);color:var(--r)}
+.inbox-type-badge.scope{background:rgba(99,102,241,0.1);color:var(--ac2)}
+.inbox-source{font-size:12px;color:var(--t2);margin-bottom:8px}
+.inbox-q{font-size:17px;font-weight:500;line-height:1.5;margin-bottom:14px}
+.inbox-ctx{padding:12px;border-radius:10px;background:var(--bg2);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t2);line-height:1.6;margin-bottom:14px}
+.inbox-evidence{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.inbox-ev{padding:8px;border-radius:8px;background:var(--bg2);text-align:center}
+.inbox-ev-val{font-size:16px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.inbox-ev-label{font-size:9px;color:var(--t3);margin-top:1px}
+.inbox-btns{display:flex;gap:10px}
+.inbox-btn{
+  flex:1;padding:14px;border-radius:12px;font-size:14px;font-weight:600;
+  border:none;cursor:pointer;text-align:center;transition:transform .1s;
+}
+.inbox-btn:active{transform:scale(.96)}
+.inbox-btn.left{background:rgba(239,68,68,0.1);color:var(--r)}
+.inbox-btn.right{background:rgba(34,197,94,0.1);color:var(--g)}
+.inbox-btn.mid{background:var(--sf2);color:var(--t2);border:1px solid var(--b1)}
+.inbox-hint{color:var(--t3);font-size:12px;text-align:center;margin-top:4px}
+.inbox-dots{display:flex;gap:6px;justify-content:center;margin-top:12px}
+.inbox-dot{width:8px;height:8px;border-radius:50%;background:var(--b1)}
+.inbox-dot.on{background:var(--ac)}
+
+/* ════════════════════════════════════════════ */
+/*  OTEL CHART shared                          */
+/* ════════════════════════════════════════════ */
+.otel-card{padding:14px;border-radius:12px;background:var(--sf);border:1px solid var(--b1);margin-bottom:14px}
+.otel-title{font-size:13px;font-weight:600;margin-bottom:2px}
+.otel-sub{font-size:11px;color:var(--t2);margin-bottom:10px}
+.otel-chart{width:100%;height:80px;background:var(--bg2);border-radius:8px;position:relative;overflow:hidden}
+.otel-chart svg{width:100%;height:100%}
+.otel-mark{position:absolute;top:0;bottom:0;width:1px;background:var(--y);opacity:.4}
+.otel-tag{position:absolute;top:3px;font-size:8px;color:var(--y);transform:translateX(-50%);white-space:nowrap}
+.otel-legend{display:flex;gap:14px;font-size:10px;color:var(--t2);margin-top:8px}
+.otel-ldot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:3px}
+
+/* Traces */
+.traces{padding:14px;border-radius:12px;background:var(--sf);border:1px solid var(--b1)}
+.traces-title{font-size:13px;font-weight:600;margin-bottom:10px}
+.tr{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03);font-size:11px}
+.tr-name{flex:1;font-family:'JetBrains Mono',monospace}
+.tr-bar{width:140px;height:10px;background:var(--bg);border-radius:5px;overflow:hidden;position:relative}
+.tr-fill{height:100%;border-radius:5px;position:absolute;top:0}
+.tr-dur{min-width:40px;text-align:right;color:var(--t2);font-family:'JetBrains Mono',monospace}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="safe-top"></div>
+
+<!-- ═══════ MAP ═══════ -->
+<div class="screen active" id="s-map">
+  <div class="screen-header">
+    <h1>System Map</h1>
+    <div class="sub">14 agents · 3 projects · all systems nominal</div>
+  </div>
+  <div class="screen-body">
+    <div class="sys-pulse">
+      <div class="pulse-dot"></div>
+      <div class="pulse-text">All systems nominal<span>Last incident: 3d ago · Uptime: 99.98%</span></div>
+    </div>
+
+    <div class="map-grid">
+      <div class="svc-card glass canary-state">
+        <div class="svc-head">
+          <div><div class="svc-name">api-gateway</div><div class="svc-ver">v2.34.1 → v2.35.0</div></div>
+          <div class="badge badge-canary">canary 5%</div>
+        </div>
+        <div class="svc-metrics">
+          <div class="m"><div class="m-label">p99</div><div class="m-val good">31ms</div><div class="m-delta">+3ms</div></div>
+          <div class="m"><div class="m-label">errors</div><div class="m-val good">0.01%</div><div class="m-delta">same</div></div>
+          <div class="m"><div class="m-label">rps</div><div class="m-val">2.4k</div></div>
+        </div>
+        <div class="spark">
+          <svg viewBox="0 0 400 32" preserveAspectRatio="none">
+            <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--g)" stop-opacity=".25"/><stop offset="100%" stop-color="var(--g)" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0,18 C40,17 80,19 120,18 C160,17 200,16 240,18 C280,19 300,14 320,12 C340,13 360,15 380,14 L400,15" stroke="var(--g)" stroke-width="1.5" fill="none"/>
+            <path d="M0,18 C40,17 80,19 120,18 C160,17 200,16 240,18 C280,19 300,14 320,12 C340,13 360,15 380,14 L400,15 V32 H0Z" fill="url(#sg)"/>
+          </svg>
+          <div class="spark-mark" style="left:72%"></div>
+          <div class="spark-tag" style="left:72%">deploy</div>
+        </div>
+        <div class="canary-box">
+          <div class="canary-head"><div class="canary-title">Canary: Stripe billing</div><div class="canary-time">12:47</div></div>
+          <div class="canary-bar"><div class="canary-fill" style="width:85%"></div></div>
+          <div class="canary-stages"><span class="past">5% ✓</span><span class="on">→ 25%</span><span>50%</span><span>100%</span></div>
+        </div>
+        <div class="agents-row">
+          <div class="agent-chip"><div class="agent-dot" style="background:var(--g)"></div>deployer</div>
+          <div class="agent-chip"><div class="agent-dot" style="background:var(--ac)"></div>coder-api</div>
+        </div>
+      </div>
+
+      <div class="svc-card glass healthy">
+        <div class="svc-head">
+          <div><div class="svc-name">payment-service</div><div class="svc-ver">v3.12.0</div></div>
+          <div class="badge badge-done">healthy</div>
+        </div>
+        <div class="svc-metrics">
+          <div class="m"><div class="m-label">p99</div><div class="m-val good">18ms</div><div class="m-delta">-2ms</div></div>
+          <div class="m"><div class="m-label">errors</div><div class="m-val good">0.00%</div></div>
+          <div class="m"><div class="m-label">success</div><div class="m-val good">99.4%</div></div>
+        </div>
+        <div class="agents-row">
+          <div class="agent-chip"><div class="agent-dot" style="background:var(--ac)"></div>2 coding</div>
+          <div class="agent-chip"><div class="agent-dot" style="background:var(--y)"></div>migration</div>
+        </div>
+      </div>
+
+      <div class="svc-card glass healthy">
+        <div class="svc-head">
+          <div><div class="svc-name">postgres-primary</div><div class="svc-ver">16.2 · us-east-1</div></div>
+          <div class="badge badge-done">healthy</div>
+        </div>
+        <div class="svc-metrics">
+          <div class="m"><div class="m-label">query p99</div><div class="m-val good">4ms</div></div>
+          <div class="m"><div class="m-label">conns</div><div class="m-val">84</div><div class="m-delta">/200</div></div>
+          <div class="m"><div class="m-label">repl lag</div><div class="m-val good">0.2s</div></div>
+        </div>
+      </div>
+
+      <div class="svc-card glass healthy">
+        <div class="svc-head">
+          <div><div class="svc-name">event-queue</div><div class="svc-ver">RabbitMQ 3.13</div></div>
+          <div class="badge badge-done">healthy</div>
+        </div>
+        <div class="svc-metrics">
+          <div class="m"><div class="m-label">depth</div><div class="m-val">342</div></div>
+          <div class="m"><div class="m-label">msg/s</div><div class="m-val">1.2k</div></div>
+          <div class="m"><div class="m-label">consumers</div><div class="m-val good">8</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="locks glass">
+      <div class="locks-title">🔒 Scope Locks <span style="font-size:10px;color:var(--t3);font-weight:400;margin-left:auto">3 active · 1 queued</span></div>
+      <div class="locks-grid">
+        <div class="lock ex"><div class="lock-scope">billing/**</div><div class="lock-owner">Stripe billing → coder-api</div><div class="lock-type" style="color:var(--r)">EXCLUSIVE</div></div>
+        <div class="lock sh"><div class="lock-scope">api/payments/**</div><div class="lock-owner">Stripe billing → coder-api</div><div class="lock-type" style="color:var(--ac2)">SHARED</div></div>
+        <div class="lock ex"><div class="lock-scope">db/migrations/**</div><div class="lock-owner">Stripe billing → deployer</div><div class="lock-type" style="color:var(--r)">EXCLUSIVE</div></div>
+        <div class="lock q"><div class="lock-scope">billing/**</div><div class="lock-owner">Pricing redesign — QUEUED</div><div class="lock-type" style="color:var(--y)">WAITING</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ OBJECTIVES ═══════ -->
+<div class="screen" id="s-obj">
+  <div class="screen-header">
+    <h1>Objectives</h1>
+    <div class="sub">Payments Rewrite · 12 objectives</div>
+  </div>
+  <div class="screen-body">
+
+    <div class="obj-section">
+      <div class="obj-section-title">In progress <span class="obj-section-count">3</span></div>
+
+      <div class="obj-card glass" onclick="go('s-focus')">
+        <div class="obj-head"><div class="obj-title">Migrate to Stripe v3</div><span class="badge badge-canary">canary</span></div>
+        <div class="obj-agents">5 agents · 3 repos</div>
+        <div class="obj-bar"><div class="obj-fill" style="width:60%;background:linear-gradient(90deg,var(--ac),var(--ac2))"></div></div>
+        <div class="obj-children">
+          <div class="obj-child"><div class="obj-child-dot" style="background:var(--ac)"></div><div class="obj-child-name">API endpoints</div><div class="obj-child-st dots"><span class="dot dot-done"></span><span class="dot dot-done"></span><span class="dot dot-act"></span><span class="dot dot-idle"></span></div></div>
+          <div class="obj-child"><div class="obj-child-dot" style="background:var(--y)"></div><div class="obj-child-name">Webhooks</div><div class="obj-child-st" style="color:var(--y)">⚠ decision</div></div>
+          <div class="obj-child"><div class="obj-child-dot" style="background:var(--g)"></div><div class="obj-child-name">DB migration</div><div class="obj-child-st" style="color:var(--g)">✓</div></div>
+          <div class="obj-child"><div class="obj-child-dot" style="background:var(--ac)"></div><div class="obj-child-name">Tests</div><div class="obj-child-st" style="color:var(--t2)">3/8</div></div>
+        </div>
+      </div>
+
+      <div class="obj-card glass">
+        <div class="obj-head"><div class="obj-title">Invoice PDF generation</div><span class="badge badge-run">coding</span></div>
+        <div class="obj-agents">2 agents</div>
+        <div class="obj-bar"><div class="obj-fill" style="width:35%;background:var(--ac)"></div></div>
+        <div class="stream" style="margin-top:8px"></div>
+      </div>
+
+      <div class="obj-card glass">
+        <div class="obj-head"><div class="obj-title">Auth system v2</div><span class="badge badge-run">testing</span></div>
+        <div class="obj-agents">3 agents</div>
+        <div class="obj-bar"><div class="obj-fill" style="width:80%;background:linear-gradient(90deg,var(--g),var(--ac))"></div></div>
+      </div>
+    </div>
+
+    <div class="obj-section">
+      <div class="obj-section-title">Blocked <span class="obj-section-count" style="background:rgba(234,179,8,0.1);color:var(--y)">1</span></div>
+      <div class="obj-card glass" style="border-color:rgba(234,179,8,0.15)">
+        <div class="obj-head"><div class="obj-title">Pricing page redesign</div><span class="badge badge-wait">blocked</span></div>
+        <div class="obj-agents">1 agent</div>
+        <div class="obj-dep">⏳ Waiting for "Stripe billing" to release billing/** lock</div>
+      </div>
+    </div>
+
+    <div class="obj-section">
+      <div class="obj-section-title">Done today <span class="obj-section-count">3</span></div>
+      <div class="obj-card glass" style="opacity:.6"><div class="obj-head"><div class="obj-title" style="color:var(--g)">✓ Refund flow</div></div><div class="obj-agents">deployed 11:30 · canary → 100% in 45min</div></div>
+      <div class="obj-card glass" style="opacity:.6"><div class="obj-head"><div class="obj-title" style="color:var(--g)">✓ Rate limiter</div></div><div class="obj-agents">deployed 09:15 · zero incidents</div></div>
+      <div class="obj-card glass" style="opacity:.6"><div class="obj-head"><div class="obj-title" style="color:var(--g)">✓ Push notifications</div></div><div class="obj-agents">deployed 08:40</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ FOCUS ═══════ -->
+<div class="screen" id="s-focus">
+  <div class="screen-header">
+    <div class="focus-back" onclick="go('s-obj')">← Objectives</div>
+    <h1>Migrate to Stripe v3</h1>
+    <div class="sub">5 agents · canary 5% · scope: billing, api/payments, db</div>
+  </div>
+  <div class="screen-body">
+
+    <div class="section-title">Agents</div>
+    <div class="focus-agents">
+      <div class="fa"><div class="fa-head"><div class="fa-name">architect</div><span style="color:var(--g);font-size:11px">✓</span></div><div class="fa-st">Schema done</div></div>
+      <div class="fa" style="border-color:rgba(99,102,241,0.3)"><div class="fa-head"><div class="fa-name">coder-api</div><span style="color:var(--ac2);font-size:11px">●</span></div><div class="fa-st">Editing pay.js</div><div class="stream" style="margin-top:6px"></div></div>
+      <div class="fa"><div class="fa-head"><div class="fa-name">coder-ui</div><span style="color:var(--ac2);font-size:11px">●</span></div><div class="fa-st">Checkout form</div><div class="stream" style="margin-top:6px"></div></div>
+    </div>
+    <div class="focus-agents" style="margin-top:8px;grid-template-columns:1fr 1fr">
+      <div class="fa" style="border-color:rgba(234,179,8,0.3)"><div class="fa-head"><div class="fa-name">tester</div><span style="color:var(--y);font-size:11px">⚠</span></div><div class="fa-st">Waiting for coder</div><div class="fa-detail">3/8 passing</div></div>
+      <div class="fa" style="border-color:rgba(34,197,94,0.3)"><div class="fa-head"><div class="fa-name">deployer</div><span style="color:var(--g);font-size:11px">●</span></div><div class="fa-st">Canary 5% for 12min</div><div class="fa-detail">Will promote at 15min</div></div>
+    </div>
+
+    <div class="section-title">Deploy</div>
+    <div class="deploy-box">
+      <div class="deploy-head">
+        <div class="deploy-title">Canary → v2.35.0</div>
+        <span class="badge badge-canary">5% → 25%</span>
+      </div>
+      <div class="deploy-metrics">
+        <div class="dm"><div class="dm-label">p99</div><div class="dm-val" style="color:var(--g)">31ms</div><div class="dm-delta" style="color:var(--t3)">base: 28ms</div></div>
+        <div class="dm"><div class="dm-label">errors</div><div class="dm-val" style="color:var(--g)">0.01%</div><div class="dm-delta" style="color:var(--t3)">unchanged</div></div>
+        <div class="dm"><div class="dm-label">pay success</div><div class="dm-val" style="color:var(--g)">99.3%</div><div class="dm-delta" style="color:var(--g)">+0.1%</div></div>
+      </div>
+      <div class="canary-bar"><div class="canary-fill" style="width:85%"></div></div>
+      <div class="canary-stages" style="margin-bottom:12px"><span class="past">5% ✓</span><span class="on">→ 25% (2m left)</span><span>50%</span><span>100%</span></div>
+      <div class="deploy-btns">
+        <button class="deploy-btn primary">Promote</button>
+        <button class="deploy-btn">Hold</button>
+        <button class="deploy-btn danger">Rollback</button>
+      </div>
+    </div>
+
+    <div class="section-title">Scope & Locks</div>
+    <div class="scope-locks">
+      <div class="sl"><span class="sl-path">billing/**</span><span class="sl-type w">EXCLUSIVE</span><span style="font-size:10px;color:var(--y)">Pricing queued</span></div>
+      <div class="sl"><span class="sl-path">api/payments/**</span><span class="sl-type w">SHARED</span></div>
+      <div class="sl"><span class="sl-path">db/migrations/**</span><span class="sl-type w">EXCLUSIVE</span></div>
+    </div>
+
+    <div class="section-title">Artifacts</div>
+    <div class="artifacts">
+      <div class="art"><div class="art-name">routes/pay.js</div><div class="art-detail" style="color:var(--ac2)">+84 -31</div></div>
+      <div class="art"><div class="art-name">billing/intent.js</div><div class="art-detail" style="color:var(--ac2)">new +120</div></div>
+      <div class="art"><div class="art-name">checkout.tsx</div><div class="art-detail" style="color:var(--ac2)">+45</div></div>
+      <div class="art"><div class="art-name">stripe-client.js</div><div class="art-detail" style="color:var(--ac2)">+62</div></div>
+      <div class="art"><div class="art-name">migration_012.sql</div><div class="art-detail" style="color:var(--g)">✓ applied</div></div>
+      <div class="art"><div class="art-name">pay.test.js</div><div class="art-detail">3/8 passing</div></div>
+    </div>
+
+    <div class="section-title">Timeline</div>
+    <div class="timeline">
+      <div class="tl"><div class="tl-time">14:12</div><div class="tl-body"><strong style="color:var(--g)">deployer</strong> — Canary stable 12min. Recommends promotion.<div class="tl-actions"><button class="tl-btn primary">Promote</button><button class="tl-btn">Hold</button></div></div></div>
+      <div class="tl"><div class="tl-time">14:07</div><div class="tl-body"><strong style="color:var(--ac2)">coder-api</strong> — "Return paymentIntent ID or compat layer?"<div class="tl-actions"><button class="tl-btn primary">New ID</button><button class="tl-btn">Compat</button></div></div></div>
+      <div class="tl"><div class="tl-time">14:05</div><div class="tl-body"><strong style="color:var(--r)">tester</strong> — "handles currency conversion" failed at pay.js:42</div></div>
+      <div class="tl"><div class="tl-time">14:03</div><div class="tl-body"><strong style="color:var(--ac2)">coder-api</strong> — charges.create → paymentIntents.create</div></div>
+      <div class="tl"><div class="tl-time">14:00</div><div class="tl-body"><strong style="color:var(--g)">deployer</strong> — Canary deployed 5% us-east-1</div></div>
+      <div class="tl"><div class="tl-time">13:50</div><div class="tl-body"><strong style="color:var(--p)">lock-manager</strong> — Pricing redesign queued behind Stripe billing for billing/**</div></div>
+      <div class="tl"><div class="tl-time">13:30</div><div class="tl-body"><strong>system</strong> — Objective started. 5 agents spawned. Scope locked.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ INBOX ═══════ -->
+<div class="screen" id="s-inbox">
+  <div class="screen-header">
+    <h1>Inbox</h1>
+    <div class="sub">7 decisions waiting</div>
+  </div>
+  <div class="inbox-body">
+    <div class="inbox-stack">
+      <div class="inbox-bg"></div>
+      <div class="inbox-bg"></div>
+      <div class="inbox-front" id="inbox-card">
+        <div class="inbox-type-badge deploy" id="inbox-type">⚡ DEPLOY GATE</div>
+        <div class="inbox-source" id="inbox-src">Payments › Stripe v3 › deployer</div>
+        <div class="inbox-q" id="inbox-q">Canary at 5% for 15 minutes. All metrics green. Promote to 25%?</div>
+        <div class="inbox-evidence" id="inbox-ev">
+          <div class="inbox-ev"><div class="inbox-ev-val" style="color:var(--g)">31ms</div><div class="inbox-ev-label">p99 (base 28ms)</div></div>
+          <div class="inbox-ev"><div class="inbox-ev-val" style="color:var(--g)">0.01%</div><div class="inbox-ev-label">error rate</div></div>
+          <div class="inbox-ev"><div class="inbox-ev-val" style="color:var(--g)">99.3%</div><div class="inbox-ev-label">pay success</div></div>
+        </div>
+        <div class="inbox-btns" id="inbox-btns">
+          <button class="inbox-btn left" onclick="swipeCard('left')">Hold at 5%</button>
+          <button class="inbox-btn mid" onclick="swipeCard('right')">Traces</button>
+          <button class="inbox-btn right" onclick="swipeCard('right')">Promote →</button>
+        </div>
+      </div>
+    </div>
+    <div class="inbox-hint">swipe or tap to decide</div>
+    <div class="inbox-dots" id="inbox-dots">
+      <div class="inbox-dot on"></div><div class="inbox-dot"></div><div class="inbox-dot"></div><div class="inbox-dot"></div><div class="inbox-dot"></div><div class="inbox-dot"></div><div class="inbox-dot"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ OTEL ═══════ -->
+<div class="screen" id="s-otel">
+  <div class="screen-header">
+    <h1>Observability</h1>
+    <div class="sub">All services · last 6 hours</div>
+  </div>
+  <div class="screen-body">
+    <div class="otel-card">
+      <div class="otel-title">API Gateway — Latency</div>
+      <div class="otel-sub">p50 / p95 / p99</div>
+      <div class="otel-chart">
+        <svg viewBox="0 0 600 80" preserveAspectRatio="none">
+          <defs><linearGradient id="olg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--g)" stop-opacity=".15"/><stop offset="100%" stop-color="var(--g)" stop-opacity="0"/></linearGradient></defs>
+          <path d="M0,50 C50,49 100,51 150,50 C200,48 250,49 300,50 C350,48 380,40 400,34 C420,30 450,36 500,38 C550,37 600,36 600,36" stroke="var(--y)" stroke-width="2" fill="none"/>
+          <path d="M0,60 C50,59 100,61 150,60 C200,58 250,59 300,60 C350,58 380,52 400,48 C420,46 450,50 500,52 C550,51 600,50 600,50" stroke="var(--ac)" stroke-width="1.5" fill="none"/>
+          <path d="M0,70 C50,69 100,71 150,70 C200,68 250,69 300,70 C350,69 380,65 400,62 C420,60 450,64 500,66 C550,65 600,64 600,64" stroke="var(--g)" stroke-width="1" fill="none" opacity=".5"/>
+        </svg>
+        <div class="otel-mark" style="left:65%"></div>
+        <div class="otel-tag" style="left:65%">▼ canary</div>
+      </div>
+      <div class="otel-legend"><span><span class="otel-ldot" style="background:var(--y)"></span>p99</span><span><span class="otel-ldot" style="background:var(--ac)"></span>p95</span><span><span class="otel-ldot" style="background:var(--g)"></span>p50</span></div>
+    </div>
+
+    <div class="otel-card">
+      <div class="otel-title">Error Rate</div>
+      <div class="otel-sub">all services</div>
+      <div class="otel-chart">
+        <svg viewBox="0 0 600 80" preserveAspectRatio="none">
+          <path d="M0,72 C100,72 200,72 300,72 C350,72 380,70 400,67 C420,69 450,72 500,72 C550,72 600,72 600,72" stroke="var(--g)" stroke-width="1.5" fill="none"/>
+          <path d="M0,74 C200,74 400,74 600,74" stroke="var(--ac)" stroke-width="1" fill="none" opacity=".5"/>
+        </svg>
+        <div class="otel-mark" style="left:65%"></div>
+      </div>
+      <div class="otel-legend"><span><span class="otel-ldot" style="background:var(--g)"></span>api-gateway 0.01%</span><span><span class="otel-ldot" style="background:var(--ac)"></span>payment-svc 0.00%</span></div>
+    </div>
+
+    <div class="traces">
+      <div class="traces-title">Recent Traces — Canary</div>
+      <div class="tr"><div class="tr-name">POST /api/pay</div><div class="tr-bar"><div class="tr-fill" style="left:0;width:100%;background:var(--g);opacity:.5"></div></div><div class="tr-dur">31ms</div></div>
+      <div class="tr" style="padding-left:16px"><div class="tr-name" style="color:var(--t2)">→ stripe.paymentIntents</div><div class="tr-bar"><div class="tr-fill" style="left:10%;width:75%;background:var(--ac);opacity:.4"></div></div><div class="tr-dur">23ms</div></div>
+      <div class="tr" style="padding-left:16px"><div class="tr-name" style="color:var(--t2)">→ db.insert</div><div class="tr-bar"><div class="tr-fill" style="left:85%;width:12%;background:var(--c);opacity:.4"></div></div><div class="tr-dur">4ms</div></div>
+      <div class="tr"><div class="tr-name">POST /api/webhook</div><div class="tr-bar"><div class="tr-fill" style="left:0;width:58%;background:var(--g);opacity:.5"></div></div><div class="tr-dur">18ms</div></div>
+      <div class="tr" style="padding-left:16px"><div class="tr-name" style="color:var(--t2)">→ verify_sig</div><div class="tr-bar"><div class="tr-fill" style="left:5%;width:15%;background:var(--ac);opacity:.4"></div></div><div class="tr-dur">3ms</div></div>
+      <div class="tr" style="padding-left:16px"><div class="tr-name" style="color:var(--t2)">→ process_event</div><div class="tr-bar"><div class="tr-fill" style="left:25%;width:30%;background:var(--p);opacity:.4"></div></div><div class="tr-dur">9ms</div></div>
+      <div class="tr"><div class="tr-name">GET /api/billing</div><div class="tr-bar"><div class="tr-fill" style="left:0;width:25%;background:var(--g);opacity:.5"></div></div><div class="tr-dur">8ms</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ TAB BAR ═══════ -->
+<div class="tab-bar">
+  <div class="tab active" onclick="go('s-map')"><span class="tab-icon">◎</span><span class="tab-label">Map</span></div>
+  <div class="tab" onclick="go('s-obj')"><span class="tab-icon">⬡</span><span class="tab-label">Objectives</span></div>
+  <div class="tab" onclick="go('s-focus')"><span class="tab-icon">◈</span><span class="tab-label">Focus</span></div>
+  <div class="tab" onclick="go('s-inbox')"><span class="tab-icon">▣</span><span class="tab-label">Inbox</span><div class="tab-badge">7</div></div>
+  <div class="tab" onclick="go('s-otel')"><span class="tab-icon">◇</span><span class="tab-label">OTEL</span></div>
+</div>
+</div>
+
+<script>
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  const map={
+    's-map':0,'s-obj':1,'s-focus':2,'s-inbox':3,'s-otel':4
+  };
+  document.querySelectorAll('.tab')[map[id]]?.classList.add('active');
+}
+
+// Inbox swipe
+const cards=[
+  {type:'deploy',cls:'deploy',label:'⚡ DEPLOY GATE',src:'Payments › Stripe v3 › deployer',q:'Canary at 5% for 15 minutes. All metrics green. Promote to 25%?',left:'Hold',right:'Promote →',ev:true},
+  {type:'arch',cls:'arch',label:'◆ ARCHITECTURE',src:'Stripe v3 › coder-api',q:'Old endpoint returned charge ID. Return paymentIntent ID or keep compat layer?',left:'Compat',right:'New ID →',ev:false},
+  {type:'conflict',cls:'conflict',label:'⚠ CONFLICT',src:'Lock Manager',q:'"Pricing redesign" needs billing/**. Currently locked by Stripe billing. Allow concurrent or keep queued?',left:'Keep queued',right:'Allow →',ev:false},
+  {type:'scope',cls:'scope',label:'◎ SCOPE EXPAND',src:'Stripe v3 › coder-api',q:'Webhook fix requires updating event queue consumer. Approve expanding scope to queue/?',left:'Deny',right:'Approve →',ev:false},
+];
+let ci=0;
+function swipeCard(dir){
+  const el=document.getElementById('inbox-card');
+  el.classList.add('swipe-'+dir);
+  setTimeout(()=>{
+    el.classList.remove('swipe-left','swipe-right');
+    ci=(ci+1)%cards.length;
+    const c=cards[ci];
+    document.getElementById('inbox-type').className='inbox-type-badge '+c.cls;
+    document.getElementById('inbox-type').textContent=c.label;
+    document.getElementById('inbox-src').textContent=c.src;
+    document.getElementById('inbox-q').textContent=c.q;
+    document.getElementById('inbox-ev').style.display=c.ev?'grid':'none';
+    const btns=document.getElementById('inbox-btns');
+    btns.children[0].textContent=c.left;
+    btns.children[2].textContent=c.right;
+    document.querySelectorAll('.inbox-dot').forEach((d,i)=>d.classList.toggle('on',i===ci));
+  },300);
+}
+
+// Touch swipe on inbox card
+let startX=0;
+const card=document.getElementById('inbox-card');
+card.addEventListener('touchstart',e=>{startX=e.touches[0].clientX},{passive:true});
+card.addEventListener('touchmove',e=>{
+  const dx=e.touches[0].clientX-startX;
+  card.style.transform=`translateX(${dx*0.5}px) rotate(${dx*0.02}deg)`;
+  card.style.opacity=1-Math.abs(dx)/500;
+},{passive:true});
+card.addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-startX;
+  card.style.transform='';card.style.opacity='';
+  if(Math.abs(dx)>80)swipeCard(dx>0?'right':'left');
+});
+</script>
+</body>
+</html>

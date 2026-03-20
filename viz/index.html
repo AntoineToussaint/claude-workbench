@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Agent Orchestrator — UI Explorations</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0a0a0f;
+    --surface: #14141f;
+    --surface2: #1a1a2e;
+    --border: #2a2a3e;
+    --text: #e8e8f0;
+    --text2: #8888a0;
+    --accent: #6366f1;
+    --accent2: #818cf8;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --orange: #f97316;
+  }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'SF Pro Display', 'Inter', system-ui, sans-serif; overflow-x: hidden; }
+
+  /* ── Platform Switcher ── */
+  .platform-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+    display: flex; gap: 0; background: var(--surface); border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  }
+  .platform-btn {
+    flex: 1; padding: 16px 12px; text-align: center; cursor: pointer;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
+    color: var(--text2); border: none; background: none; transition: all 0.3s;
+    border-bottom: 2px solid transparent;
+  }
+  .platform-btn:hover { color: var(--text); background: var(--surface2); }
+  .platform-btn.active { color: var(--accent2); border-bottom-color: var(--accent); }
+
+  .platform-view { display: none; padding-top: 54px; min-height: 100vh; }
+  .platform-view.active { display: block; }
+
+  /* ── Shared card styles ── */
+  .glass {
+    background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  }
+  .glass:hover { border-color: rgba(255,255,255,0.15); }
+
+  .progress-dots { display: flex; gap: 4px; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot.done { background: var(--green); }
+  .dot.active { background: var(--accent2); animation: pulse 1.5s infinite; }
+  .dot.idle { background: var(--border); }
+  .dot.warn { background: var(--yellow); }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  @keyframes stream { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+  .streaming-bar {
+    height: 3px; border-radius: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+    background-size: 200% 100%;
+    animation: stream 2s linear infinite;
+  }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge.waiting { background: rgba(234,179,8,0.15); color: var(--yellow); }
+  .badge.running { background: rgba(99,102,241,0.15); color: var(--accent2); }
+  .badge.done { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge.error { background: rgba(239,68,68,0.15); color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="platform-bar">
+  <button class="platform-btn active" onclick="switchPlatform('ipad')">iPad</button>
+  <button class="platform-btn" onclick="switchPlatform('iphone')">iPhone</button>
+  <button class="platform-btn" onclick="switchPlatform('desktop')">Desktop / Tauri</button>
+  <button class="platform-btn" onclick="switchPlatform('web')">Web</button>
+  <button class="platform-btn" onclick="switchPlatform('cli')">CLI</button>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- iPad -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div id="view-ipad" class="platform-view active">
+<style>
+  .ipad-frame {
+    max-width: 1024px; margin: 20px auto; border-radius: 24px;
+    border: 2px solid var(--border); overflow: hidden; background: var(--bg);
+    aspect-ratio: 4/3; position: relative;
+  }
+  .ipad-screen { padding: 20px; height: 100%; display: flex; flex-direction: column; overflow: auto; }
+  .ipad-topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px;
+  }
+  .ipad-topbar h1 { font-size: 22px; font-weight: 700; }
+  .ipad-topbar .inbox-pill {
+    background: var(--accent); color: white; padding: 6px 16px;
+    border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+
+  /* ── Screen tabs ── */
+  .ipad-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .ipad-tab {
+    padding: 8px 16px; border-radius: 10px; font-size: 13px; font-weight: 500;
+    cursor: pointer; color: var(--text2); background: var(--surface);
+    border: 1px solid transparent; transition: all 0.2s;
+  }
+  .ipad-tab.active { color: var(--text); background: var(--surface2); border-color: var(--accent); }
+  .ipad-tab:hover { color: var(--text); }
+
+  .ipad-screen-content { display: none; flex: 1; }
+  .ipad-screen-content.active { display: flex; flex-direction: column; }
+
+  /* ── Projects Grid ── */
+  .projects-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .project-card { padding: 24px; cursor: pointer; transition: transform 0.2s; }
+  .project-card:active { transform: scale(0.97); }
+  .project-card h3 { font-size: 18px; margin-bottom: 8px; }
+  .project-card .meta { font-size: 13px; color: var(--text2); margin-bottom: 12px; }
+  .project-card .progress-track {
+    height: 6px; background: var(--surface); border-radius: 3px; overflow: hidden;
+  }
+  .project-card .progress-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+  .project-card .needs { margin-top: 10px; font-size: 12px; color: var(--yellow); }
+
+  /* ── Tree Map ── */
+  .tree-map { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; flex: 1; }
+  .tree-node { padding: 16px; cursor: pointer; transition: transform 0.2s; display: flex; flex-direction: column; }
+  .tree-node:active { transform: scale(0.98); }
+  .tree-node .node-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .tree-node .node-meta { font-size: 12px; color: var(--text2); margin-bottom: 12px; }
+  .tree-children { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: 1; }
+  .tree-child {
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 12px; font-size: 12px;
+  }
+  .tree-child .child-title { font-weight: 600; margin-bottom: 4px; }
+  .tree-child .child-status { color: var(--text2); font-size: 11px; }
+
+  /* ── Focus View ── */
+  .focus-view { gap: 16px; }
+  .focus-breadcrumb { font-size: 13px; color: var(--text2); margin-bottom: 8px; }
+  .focus-breadcrumb span { color: var(--accent2); cursor: pointer; }
+  .focus-agents { display: flex; gap: 10px; margin-bottom: 16px; }
+  .agent-chip {
+    padding: 14px 18px; border-radius: 12px; font-size: 13px;
+    background: var(--surface2); border: 1px solid var(--border); flex: 1;
+  }
+  .agent-chip .agent-name { font-weight: 600; margin-bottom: 4px; }
+  .agent-chip .agent-status { color: var(--text2); font-size: 12px; }
+  .artifacts-row { display: flex; gap: 10px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px; }
+  .artifact-card {
+    min-width: 150px; padding: 14px; border-radius: 12px;
+    background: var(--surface); border: 1px solid var(--border); font-size: 12px; cursor: pointer;
+  }
+  .artifact-card .art-name { font-weight: 600; margin-bottom: 4px; }
+  .artifact-card .art-detail { color: var(--text2); }
+  .timeline { flex: 1; overflow-y: auto; }
+  .timeline-entry { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; display: flex; gap: 10px; }
+  .timeline-time { color: var(--text2); font-size: 11px; white-space: nowrap; min-width: 40px; }
+  .timeline-body { flex: 1; }
+  .timeline-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .timeline-btn {
+    padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 500;
+    border: 1px solid var(--border); background: var(--surface2); color: var(--text); cursor: pointer;
+  }
+  .timeline-btn:first-child { background: var(--accent); border-color: var(--accent); }
+
+  /* ── Inbox Swipe ── */
+  .inbox-overlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center;
+    flex-direction: column; z-index: 10;
+  }
+  .inbox-overlay.visible { display: flex; }
+  .inbox-card {
+    width: 80%; max-width: 500px; padding: 32px; border-radius: 20px;
+    background: var(--surface); border: 1px solid var(--border);
+    position: relative; transition: transform 0.3s, opacity 0.3s;
+  }
+  .inbox-card .inbox-source { font-size: 12px; color: var(--text2); margin-bottom: 12px; }
+  .inbox-card .inbox-question { font-size: 16px; line-height: 1.5; margin-bottom: 16px; }
+  .inbox-card .inbox-context {
+    background: var(--bg); padding: 12px; border-radius: 10px;
+    font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px;
+    color: var(--text2); margin-bottom: 20px;
+  }
+  .inbox-actions { display: flex; justify-content: space-between; }
+  .inbox-action {
+    padding: 12px 24px; border-radius: 12px; font-size: 14px; font-weight: 600;
+    border: none; cursor: pointer; transition: transform 0.15s;
+  }
+  .inbox-action:active { transform: scale(0.95); }
+  .inbox-action.reject { background: rgba(239,68,68,0.15); color: var(--red); }
+  .inbox-action.approve { background: rgba(34,197,94,0.15); color: var(--green); }
+  .inbox-counter { color: var(--text2); font-size: 13px; margin-top: 16px; }
+  .inbox-close {
+    position: absolute; top: -40px; right: 0; color: var(--text2);
+    font-size: 24px; cursor: pointer; background: none; border: none;
+  }
+</style>
+
+<div class="ipad-frame">
+  <div class="ipad-screen">
+    <div class="ipad-topbar">
+      <h1 id="ipad-title">Projects</h1>
+      <div class="inbox-pill" onclick="toggleInbox()">Inbox · 4</div>
+    </div>
+
+    <div class="ipad-tabs" id="ipad-tabs">
+      <div class="ipad-tab active" onclick="ipadScreen('projects')">Projects</div>
+      <div class="ipad-tab" onclick="ipadScreen('map')">Map</div>
+      <div class="ipad-tab" onclick="ipadScreen('focus')">Focus</div>
+    </div>
+
+    <!-- Projects -->
+    <div class="ipad-screen-content active" id="ipad-projects">
+      <div class="projects-grid">
+        <div class="project-card glass" onclick="ipadScreen('map')">
+          <h3>Payments Rewrite</h3>
+          <div class="meta">3 repos · 12 objectives</div>
+          <div class="progress-track"><div class="progress-fill" style="width:55%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div>
+          <div class="needs">2 need your attention</div>
+        </div>
+        <div class="project-card glass">
+          <h3>Mobile App v3</h3>
+          <div class="meta">1 repo · 4 objectives</div>
+          <div class="progress-track"><div class="progress-fill" style="width:100%;background:var(--green)"></div></div>
+        </div>
+        <div class="project-card glass">
+          <h3>Infra Migration</h3>
+          <div class="meta">2 repos · 7 objectives</div>
+          <div class="progress-track"><div class="progress-fill" style="width:30%;background:linear-gradient(90deg,var(--accent),var(--orange))"></div></div>
+          <div class="needs">1 agent errored</div>
+        </div>
+        <div class="project-card glass" style="border-style:dashed;display:flex;align-items:center;justify-content:center;color:var(--text2)">
+          <div style="text-align:center"><div style="font-size:28px;margin-bottom:8px">+</div><div style="font-size:13px">New project</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div class="ipad-screen-content" id="ipad-map">
+      <div class="tree-map">
+        <div class="tree-node glass" onclick="ipadScreen('focus')">
+          <div class="node-title">Migrate to Stripe v3</div>
+          <div class="node-meta">
+            <span class="badge running">4 agents</span>
+            <span style="margin-left:6px" class="badge waiting">1 waiting</span>
+          </div>
+          <div class="tree-children">
+            <div class="tree-child">
+              <div class="child-title">API endpoints</div>
+              <div class="progress-dots"><span class="dot done"></span><span class="dot done"></span><span class="dot active"></span><span class="dot idle"></span></div>
+              <div class="child-status">POST /pay in progress</div>
+            </div>
+            <div class="tree-child" style="border-color:rgba(234,179,8,0.3)">
+              <div class="child-title">Webhooks</div>
+              <div class="child-status" style="color:var(--yellow)">⚠ needs decision</div>
+            </div>
+            <div class="tree-child">
+              <div class="child-title">DB migration</div>
+              <div class="child-status" style="color:var(--green)">✓ done</div>
+            </div>
+            <div class="tree-child">
+              <div class="child-title">Integration tests</div>
+              <div class="progress-dots"><span class="dot done"></span><span class="dot done"></span><span class="dot done"></span><span class="dot active"></span><span class="dot idle"></span><span class="dot idle"></span><span class="dot idle"></span><span class="dot idle"></span></div>
+              <div class="child-status">3/8 passing</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="tree-node glass">
+            <div class="node-title">Refund flow</div>
+            <div class="node-meta"><span class="badge done">complete</span></div>
+            <div style="color:var(--green);font-size:13px;margin-top:8px">✓ All 3 sub-objectives done</div>
+          </div>
+          <div class="tree-node glass">
+            <div class="node-title">Invoice PDF generation</div>
+            <div class="node-meta"><span class="badge running">2 agents</span></div>
+            <div class="streaming-bar" style="margin-top:auto"></div>
+          </div>
+          <div class="tree-node glass" style="border-style:dashed;align-items:center;justify-content:center;color:var(--text2);min-height:80px">
+            <div style="font-size:13px">+ add objective</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Focus -->
+    <div class="ipad-screen-content focus-view" id="ipad-focus">
+      <div class="focus-breadcrumb">
+        <span onclick="ipadScreen('projects')">Payments</span> › <span onclick="ipadScreen('map')">Stripe v3</span> › API endpoints › <strong>POST /pay</strong>
+        <span style="float:right">
+          <span class="dot done" style="display:inline-block"></span>
+          <span class="dot active" style="display:inline-block"></span>
+          <span class="dot idle" style="display:inline-block"></span>
+          <span style="color:var(--text2);font-size:11px;margin-left:4px">siblings</span>
+        </span>
+      </div>
+
+      <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;margin-top:12px">Agents</div>
+      <div class="focus-agents">
+        <div class="agent-chip">
+          <div class="agent-name">coder</div>
+          <div class="agent-status">editing pay.js</div>
+          <div class="streaming-bar" style="margin-top:8px"></div>
+        </div>
+        <div class="agent-chip">
+          <div class="agent-name">reviewer</div>
+          <div class="agent-status">waiting for coder</div>
+        </div>
+        <div class="agent-chip">
+          <div class="agent-name">test-runner</div>
+          <div class="agent-status">2/4 passing</div>
+          <div class="progress-dots" style="margin-top:6px"><span class="dot done"></span><span class="dot done"></span><span class="dot active"></span><span class="dot idle"></span></div>
+        </div>
+      </div>
+
+      <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Artifacts</div>
+      <div class="artifacts-row">
+        <div class="artifact-card"><div class="art-name">routes/pay.js</div><div class="art-detail" style="color:var(--accent2)">● modified +28 -12</div></div>
+        <div class="artifact-card"><div class="art-name">pay.test.js</div><div class="art-detail">2/4 passing</div></div>
+        <div class="artifact-card"><div class="art-name">migration_012.sql</div><div class="art-detail" style="color:var(--green)">✓ applied</div></div>
+        <div class="artifact-card"><div class="art-name">stripe-client.js</div><div class="art-detail" style="color:var(--accent2)">● new file</div></div>
+      </div>
+
+      <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Timeline</div>
+      <div class="timeline">
+        <div class="timeline-entry">
+          <div class="timeline-time">14:07</div>
+          <div class="timeline-body">
+            <strong>coder</strong> asks: "The old endpoint returned the charge ID — should the new one return the paymentIntent ID or keep a compat layer?"
+            <div class="timeline-actions">
+              <button class="timeline-btn">Return new ID</button>
+              <button class="timeline-btn">Compat layer</button>
+            </div>
+          </div>
+        </div>
+        <div class="timeline-entry">
+          <div class="timeline-time">14:05</div>
+          <div class="timeline-body"><strong>test-runner</strong> — test "handles currency conversion" failed at pay.js:42</div>
+        </div>
+        <div class="timeline-entry">
+          <div class="timeline-time">14:03</div>
+          <div class="timeline-body"><strong>coder</strong> — switching from charges.create to paymentIntents.create</div>
+        </div>
+        <div class="timeline-entry">
+          <div class="timeline-time">14:01</div>
+          <div class="timeline-body"><strong>coder</strong> — started editing routes/pay.js</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inbox overlay -->
+  <div class="inbox-overlay" id="inbox-overlay">
+    <div class="inbox-card">
+      <button class="inbox-close" onclick="toggleInbox()">×</button>
+      <div class="inbox-source">Payments › Stripe v3 › Webhooks</div>
+      <div class="inbox-question">
+        "Stripe sends retry headers on failed webhook deliveries. Should I implement idempotency keys to prevent duplicate processing?"
+      </div>
+      <div class="inbox-context">
+        webhook.js:34 — currently processes every delivery<br>
+        without checking for duplicates. Stripe retries<br>
+        up to 3x over 24 hours.
+      </div>
+      <div class="inbox-actions">
+        <button class="inbox-action reject">← Skip for now</button>
+        <button class="inbox-action approve">Yes, add idempotency →</button>
+      </div>
+    </div>
+    <div class="inbox-counter">1 of 4 · swipe or tap to decide</div>
+  </div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- iPhone -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div id="view-iphone" class="platform-view">
+<style>
+  .iphone-frame {
+    width: 390px; height: 844px; margin: 20px auto; border-radius: 44px;
+    border: 3px solid var(--border); overflow: hidden; background: var(--bg);
+    position: relative;
+  }
+  .iphone-notch {
+    width: 160px; height: 34px; background: var(--border); border-radius: 0 0 20px 20px;
+    margin: 0 auto;
+  }
+  .iphone-screen { padding: 8px 16px; height: calc(100% - 34px); overflow-y: auto; display: flex; flex-direction: column; }
+  .iphone-header { padding: 12px 0; }
+  .iphone-header h1 { font-size: 28px; font-weight: 700; }
+  .iphone-header .subtitle { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+  .iphone-section-title {
+    font-size: 11px; color: var(--text2); text-transform: uppercase;
+    letter-spacing: 1px; margin: 16px 0 8px;
+  }
+
+  .iphone-card {
+    padding: 16px; margin-bottom: 10px; border-radius: 14px;
+    background: var(--surface); border: 1px solid var(--border);
+  }
+  .iphone-card h3 { font-size: 16px; margin-bottom: 4px; }
+  .iphone-card .meta { font-size: 12px; color: var(--text2); }
+
+  .iphone-inbox-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 16px; padding: 20px; margin-bottom: 10px;
+  }
+  .iphone-inbox-card .source { font-size: 11px; color: var(--text2); margin-bottom: 6px; }
+  .iphone-inbox-card .question { font-size: 15px; line-height: 1.4; margin-bottom: 12px; }
+  .iphone-inbox-btns { display: flex; gap: 8px; }
+  .iphone-inbox-btn {
+    flex: 1; padding: 10px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    border: none; cursor: pointer; text-align: center;
+  }
+  .iphone-inbox-btn.yes { background: rgba(34,197,94,0.15); color: var(--green); }
+  .iphone-inbox-btn.no { background: rgba(239,68,68,0.1); color: var(--red); }
+
+  .iphone-tab-bar {
+    display: flex; position: absolute; bottom: 0; left: 0; right: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding: 8px 0 24px; /* safe area */
+  }
+  .iphone-tab {
+    flex: 1; text-align: center; font-size: 10px; color: var(--text2);
+    padding: 6px 0; cursor: pointer;
+  }
+  .iphone-tab.active { color: var(--accent2); }
+  .iphone-tab-icon { font-size: 20px; margin-bottom: 2px; }
+
+  .iphone-objective-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .iphone-obj-indicator { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .iphone-obj-info { flex: 1; }
+  .iphone-obj-title { font-size: 15px; font-weight: 500; }
+  .iphone-obj-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .iphone-obj-badge { font-size: 11px; }
+</style>
+
+<div class="iphone-frame">
+  <div class="iphone-notch"></div>
+  <div class="iphone-screen">
+    <div class="iphone-header">
+      <h1>Payments Rewrite</h1>
+      <div class="subtitle">3 repos · 12 objectives · 2 need you</div>
+    </div>
+
+    <div class="iphone-section-title">Needs attention</div>
+
+    <div class="iphone-inbox-card">
+      <div class="source">Stripe v3 › Webhooks › coder</div>
+      <div class="question">"Should I implement idempotency keys for webhook retries?"</div>
+      <div class="iphone-inbox-btns">
+        <button class="iphone-inbox-btn no">Skip</button>
+        <button class="iphone-inbox-btn yes">Yes →</button>
+      </div>
+    </div>
+
+    <div class="iphone-inbox-card">
+      <div class="source">Stripe v3 › API endpoints › coder</div>
+      <div class="question">"Return paymentIntent ID or keep compat layer?"</div>
+      <div class="iphone-inbox-btns">
+        <button class="iphone-inbox-btn yes">New ID</button>
+        <button class="iphone-inbox-btn yes">Compat</button>
+      </div>
+    </div>
+
+    <div class="iphone-section-title">Objectives</div>
+
+    <div class="iphone-objective-row">
+      <div class="iphone-obj-indicator" style="background:var(--accent2)"></div>
+      <div class="iphone-obj-info">
+        <div class="iphone-obj-title">Migrate to Stripe v3</div>
+        <div class="iphone-obj-sub">4 sub-objectives · 2 agents active</div>
+      </div>
+      <div class="iphone-obj-badge badge running">6/10</div>
+    </div>
+
+    <div class="iphone-objective-row">
+      <div class="iphone-obj-indicator" style="background:var(--green)"></div>
+      <div class="iphone-obj-info">
+        <div class="iphone-obj-title">Refund flow</div>
+        <div class="iphone-obj-sub">all done</div>
+      </div>
+      <div class="iphone-obj-badge badge done">✓</div>
+    </div>
+
+    <div class="iphone-objective-row">
+      <div class="iphone-obj-indicator" style="background:var(--orange)"></div>
+      <div class="iphone-obj-info">
+        <div class="iphone-obj-title">Invoice PDF generation</div>
+        <div class="iphone-obj-sub">2 agents streaming</div>
+      </div>
+      <div class="iphone-obj-badge badge running">2/5</div>
+    </div>
+
+    <div style="padding-bottom:80px"></div>
+  </div>
+
+  <div class="iphone-tab-bar">
+    <div class="iphone-tab active"><div class="iphone-tab-icon">◉</div>Projects</div>
+    <div class="iphone-tab"><div class="iphone-tab-icon">⬡</div>Map</div>
+    <div class="iphone-tab"><div class="iphone-tab-icon" style="position:relative">▣<span style="position:absolute;top:-2px;right:-6px;width:8px;height:8px;background:var(--red);border-radius:50%;display:block"></span></div>Inbox</div>
+    <div class="iphone-tab"><div class="iphone-tab-icon">⚙</div>Settings</div>
+  </div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- Desktop / Tauri -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div id="view-desktop" class="platform-view">
+<style>
+  .desktop-frame {
+    max-width: 1280px; margin: 20px auto; border-radius: 12px;
+    border: 1px solid var(--border); overflow: hidden; background: var(--bg);
+    min-height: 720px; display: flex;
+  }
+  .desktop-sidebar {
+    width: 240px; background: var(--surface); border-right: 1px solid var(--border);
+    padding: 16px; display: flex; flex-direction: column;
+  }
+  .desktop-sidebar h2 { font-size: 13px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .sidebar-item {
+    padding: 10px 12px; border-radius: 8px; font-size: 14px; cursor: pointer;
+    margin-bottom: 2px; display: flex; align-items: center; gap: 8px;
+    color: var(--text2); transition: all 0.15s;
+  }
+  .sidebar-item:hover { background: var(--surface2); color: var(--text); }
+  .sidebar-item.active { background: rgba(99,102,241,0.12); color: var(--accent2); }
+  .sidebar-item .si-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .sidebar-item .si-count { margin-left: auto; font-size: 11px; background: var(--surface2); padding: 1px 6px; border-radius: 4px; }
+
+  .sidebar-tree { margin-left: 20px; margin-top: 4px; }
+  .sidebar-tree .sidebar-item { font-size: 13px; padding: 6px 10px; }
+
+  .desktop-main { flex: 1; display: flex; flex-direction: column; }
+  .desktop-topbar {
+    padding: 12px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; font-size: 13px;
+  }
+  .desktop-topbar .breadcrumb { color: var(--text2); }
+  .desktop-topbar .breadcrumb span { color: var(--accent2); cursor: pointer; }
+  .desktop-topbar .inbox-badge {
+    margin-left: auto; background: var(--accent); color: white;
+    padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .desktop-topbar .kbd { font-size: 10px; color: var(--text2); background: var(--surface2); padding: 2px 6px; border-radius: 3px; margin-left: 4px; }
+
+  .desktop-content { flex: 1; display: flex; overflow: hidden; }
+  .desktop-left { flex: 1; padding: 20px; overflow-y: auto; border-right: 1px solid var(--border); }
+  .desktop-right { width: 380px; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+
+  .desktop-section-title { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+
+  .desktop-agents-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 24px; }
+  .desktop-agent {
+    padding: 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border);
+  }
+  .desktop-agent .da-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .desktop-agent .da-status { font-size: 12px; color: var(--text2); }
+
+  .desktop-artifacts-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 24px; }
+  .desktop-artifact {
+    padding: 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border);
+    font-size: 12px; cursor: pointer;
+  }
+  .desktop-artifact:hover { border-color: var(--accent); }
+  .desktop-artifact .da-name { font-weight: 600; margin-bottom: 3px; font-size: 13px; }
+  .desktop-artifact .da-detail { color: var(--text2); }
+
+  .desktop-timeline-entry {
+    padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+    display: flex; gap: 10px; font-size: 13px;
+  }
+  .dt-time { color: var(--text2); font-size: 11px; min-width: 36px; }
+  .dt-body { flex: 1; }
+  .dt-actions { display: flex; gap: 6px; margin-top: 6px; }
+  .dt-btn {
+    padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
+    border: 1px solid var(--border); background: var(--surface2); color: var(--text); cursor: pointer;
+  }
+  .dt-btn.primary { background: var(--accent); border-color: var(--accent); }
+  .dt-btn .kbd { font-size: 10px; color: rgba(255,255,255,0.5); margin-left: 4px; }
+
+  /* Right panel — file preview */
+  .file-preview-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 10px;
+  }
+  .file-preview-header h3 { font-size: 14px; }
+  .file-preview-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .fp-tab { font-size: 11px; padding: 4px 10px; border-radius: 6px; background: var(--surface); cursor: pointer; color: var(--text2); }
+  .fp-tab.active { background: var(--surface2); color: var(--text); }
+  .file-preview-code {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 12px; line-height: 1.6; flex: 1; overflow-y: auto;
+  }
+  .code-line { display: flex; }
+  .code-ln { color: var(--text2); min-width: 32px; text-align: right; padding-right: 12px; user-select: none; opacity: 0.5; }
+  .code-add { background: rgba(34,197,94,0.08); }
+  .code-del { background: rgba(239,68,68,0.08); }
+  .code-add .code-text { color: var(--green); }
+  .code-del .code-text { color: var(--red); }
+</style>
+
+<div class="desktop-frame">
+  <div class="desktop-sidebar">
+    <h2>Projects</h2>
+    <div class="sidebar-item active">
+      <div class="si-dot" style="background:var(--accent2)"></div>
+      Payments Rewrite
+      <div class="si-count">2</div>
+    </div>
+    <div class="sidebar-tree">
+      <div class="sidebar-item active">
+        <div class="si-dot" style="background:var(--accent);width:6px;height:6px"></div>
+        Migrate Stripe v3
+      </div>
+      <div class="sidebar-tree">
+        <div class="sidebar-item active" style="font-weight:600;color:var(--text)">
+          API endpoints
+        </div>
+        <div class="sidebar-item" style="position:relative">
+          Webhooks
+          <div class="si-dot" style="background:var(--yellow);width:6px;height:6px;position:absolute;right:8px"></div>
+        </div>
+        <div class="sidebar-item" style="color:var(--green)">DB migration ✓</div>
+        <div class="sidebar-item">Tests</div>
+      </div>
+      <div class="sidebar-item" style="color:var(--green)">Refund flow ✓</div>
+      <div class="sidebar-item">Invoice PDF</div>
+    </div>
+    <div class="sidebar-item">
+      <div class="si-dot" style="background:var(--green)"></div>
+      Mobile App v3
+    </div>
+    <div class="sidebar-item">
+      <div class="si-dot" style="background:var(--orange)"></div>
+      Infra Migration
+      <div class="si-count">1</div>
+    </div>
+
+    <div style="margin-top:auto;padding-top:16px;border-top:1px solid var(--border)">
+      <div class="sidebar-item" style="font-size:12px">⚙ Settings</div>
+      <div class="sidebar-item" style="font-size:12px">? Shortcuts <span class="kbd" style="margin-left:auto;font-size:10px;background:var(--surface2);padding:1px 5px;border-radius:3px">⌘K</span></div>
+    </div>
+  </div>
+
+  <div class="desktop-main">
+    <div class="desktop-topbar">
+      <div class="breadcrumb">
+        <span>Payments</span> › <span>Stripe v3</span> › <strong style="color:var(--text)">API endpoints</strong>
+      </div>
+      <div class="inbox-badge">4 decisions <span class="kbd">⌘I</span></div>
+    </div>
+
+    <div class="desktop-content">
+      <div class="desktop-left">
+        <div class="desktop-section-title">Agents</div>
+        <div class="desktop-agents-grid">
+          <div class="desktop-agent">
+            <div class="da-name">coder</div>
+            <div class="da-status">editing pay.js</div>
+            <div class="streaming-bar" style="margin-top:8px"></div>
+          </div>
+          <div class="desktop-agent">
+            <div class="da-name">reviewer</div>
+            <div class="da-status">waiting for coder</div>
+          </div>
+          <div class="desktop-agent">
+            <div class="da-name">test-runner</div>
+            <div class="da-status">2/4 passing</div>
+            <div class="progress-dots" style="margin-top:6px"><span class="dot done"></span><span class="dot done"></span><span class="dot active"></span><span class="dot idle"></span></div>
+          </div>
+        </div>
+
+        <div class="desktop-section-title">Artifacts</div>
+        <div class="desktop-artifacts-grid">
+          <div class="desktop-artifact" style="border-color:var(--accent)">
+            <div class="da-name">routes/pay.js</div>
+            <div class="da-detail" style="color:var(--accent2)">+28 -12</div>
+          </div>
+          <div class="desktop-artifact">
+            <div class="da-name">pay.test.js</div>
+            <div class="da-detail">2/4 passing</div>
+          </div>
+          <div class="desktop-artifact">
+            <div class="da-name">migration_012.sql</div>
+            <div class="da-detail" style="color:var(--green)">✓ applied</div>
+          </div>
+          <div class="desktop-artifact">
+            <div class="da-name">stripe-client.js</div>
+            <div class="da-detail" style="color:var(--accent2)">new file</div>
+          </div>
+        </div>
+
+        <div class="desktop-section-title">Timeline</div>
+        <div class="desktop-timeline-entry">
+          <div class="dt-time">14:07</div>
+          <div class="dt-body">
+            <strong>coder</strong> — "Return paymentIntent ID or keep compat layer?"
+            <div class="dt-actions">
+              <button class="dt-btn primary">New ID <span class="kbd">1</span></button>
+              <button class="dt-btn">Compat <span class="kbd">2</span></button>
+            </div>
+          </div>
+        </div>
+        <div class="desktop-timeline-entry">
+          <div class="dt-time">14:05</div>
+          <div class="dt-body"><strong>test-runner</strong> — "handles currency conversion" failed at pay.js:42</div>
+        </div>
+        <div class="desktop-timeline-entry">
+          <div class="dt-time">14:03</div>
+          <div class="dt-body"><strong>coder</strong> — switched from charges.create → paymentIntents.create</div>
+        </div>
+      </div>
+
+      <div class="desktop-right">
+        <div class="file-preview-header">
+          <h3>routes/pay.js</h3>
+          <span style="font-size:12px;color:var(--text2)">by coder · 14:06</span>
+        </div>
+        <div class="file-preview-tabs">
+          <div class="fp-tab active">Diff</div>
+          <div class="fp-tab">Full file</div>
+          <div class="fp-tab">Blame</div>
+        </div>
+        <div class="file-preview-code">
+          <div class="code-line"><span class="code-ln">38</span><span class="code-text">  const stripe = new Stripe(key);</span></div>
+          <div class="code-line"><span class="code-ln">39</span><span class="code-text"></span></div>
+          <div class="code-line code-del"><span class="code-ln">40</span><span class="code-text">- const charge = await stripe.charges.create({</span></div>
+          <div class="code-line code-del"><span class="code-ln">41</span><span class="code-text">-   amount: req.body.amount,</span></div>
+          <div class="code-line code-del"><span class="code-ln">42</span><span class="code-text">-   currency: req.body.currency,</span></div>
+          <div class="code-line code-del"><span class="code-ln">43</span><span class="code-text">-   source: req.body.token,</span></div>
+          <div class="code-line code-del"><span class="code-ln">44</span><span class="code-text">- });</span></div>
+          <div class="code-line"><span class="code-ln">45</span><span class="code-text"></span></div>
+          <div class="code-line code-add"><span class="code-ln">40</span><span class="code-text">+ const intent = await stripe.paymentIntents.create({</span></div>
+          <div class="code-line code-add"><span class="code-ln">41</span><span class="code-text">+   amount: req.body.amount,</span></div>
+          <div class="code-line code-add"><span class="code-ln">42</span><span class="code-text">+   currency: req.body.currency,</span></div>
+          <div class="code-line code-add"><span class="code-ln">43</span><span class="code-text">+   payment_method: req.body.paymentMethod,</span></div>
+          <div class="code-line code-add"><span class="code-ln">44</span><span class="code-text">+   confirm: true,</span></div>
+          <div class="code-line code-add"><span class="code-ln">45</span><span class="code-text">+   automatic_payment_methods: {</span></div>
+          <div class="code-line code-add"><span class="code-ln">46</span><span class="code-text">+     enabled: true,</span></div>
+          <div class="code-line code-add"><span class="code-ln">47</span><span class="code-text">+     allow_redirects: 'never',</span></div>
+          <div class="code-line code-add"><span class="code-ln">48</span><span class="code-text">+   },</span></div>
+          <div class="code-line code-add"><span class="code-ln">49</span><span class="code-text">+ });</span></div>
+          <div class="code-line"><span class="code-ln">50</span><span class="code-text"></span></div>
+          <div class="code-line"><span class="code-ln">51</span><span class="code-text">  res.json({</span></div>
+          <div class="code-line code-del"><span class="code-ln">52</span><span class="code-text">-   id: charge.id,</span></div>
+          <div class="code-line code-del"><span class="code-ln">53</span><span class="code-text">-   status: charge.status,</span></div>
+          <div class="code-line code-add"><span class="code-ln">52</span><span class="code-text">+   id: intent.id,</span></div>
+          <div class="code-line code-add"><span class="code-ln">53</span><span class="code-text">+   status: intent.status,</span></div>
+          <div class="code-line code-add"><span class="code-ln">54</span><span class="code-text">+   clientSecret: intent.client_secret,</span></div>
+          <div class="code-line"><span class="code-ln">55</span><span class="code-text">  });</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- Web -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div id="view-web" class="platform-view">
+<style>
+  .web-frame {
+    max-width: 1100px; margin: 20px auto; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    min-height: 700px;
+  }
+  .web-nav {
+    display: flex; align-items: center; gap: 20px;
+    padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--surface);
+  }
+  .web-logo { font-size: 15px; font-weight: 700; color: var(--accent2); }
+  .web-nav-links { display: flex; gap: 4px; }
+  .web-nav-link {
+    padding: 6px 14px; border-radius: 8px; font-size: 13px; color: var(--text2);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .web-nav-link:hover { color: var(--text); background: var(--surface2); }
+  .web-nav-link.active { color: var(--text); background: var(--surface2); }
+  .web-nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .web-nav-inbox { background: var(--accent); color: white; padding: 5px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+  .web-body { padding: 24px; }
+  .web-project-header { margin-bottom: 24px; }
+  .web-project-header h1 { font-size: 24px; margin-bottom: 4px; }
+  .web-project-header .sub { font-size: 13px; color: var(--text2); }
+
+  .web-columns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .web-column h3 { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+
+  .web-obj-card {
+    padding: 16px; margin-bottom: 10px; border-radius: 12px;
+    background: var(--surface); border: 1px solid var(--border); cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .web-obj-card:hover { border-color: rgba(255,255,255,0.15); }
+  .web-obj-card h4 { font-size: 14px; margin-bottom: 6px; }
+  .web-obj-card .obj-sub { font-size: 12px; color: var(--text2); margin-bottom: 8px; }
+  .web-obj-children { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.04); }
+  .web-obj-child {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; font-size: 12px;
+  }
+  .web-obj-child-name { color: var(--text2); }
+
+  .web-decision-card {
+    padding: 16px; margin-bottom: 10px; border-radius: 12px;
+    background: var(--surface2); border: 1px solid var(--border);
+  }
+  .web-decision-card .source { font-size: 11px; color: var(--text2); margin-bottom: 6px; }
+  .web-decision-card .question { font-size: 14px; margin-bottom: 10px; }
+  .web-decision-btns { display: flex; gap: 6px; }
+  .web-decision-btn {
+    padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 500;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+  }
+  .web-decision-btn:first-child { background: var(--accent); border-color: var(--accent); }
+</style>
+
+<div class="web-frame">
+  <div class="web-nav">
+    <div class="web-logo">▲ Agent</div>
+    <div class="web-nav-links">
+      <div class="web-nav-link active">Dashboard</div>
+      <div class="web-nav-link">Projects</div>
+      <div class="web-nav-link">Agents</div>
+      <div class="web-nav-link">Settings</div>
+    </div>
+    <div class="web-nav-right">
+      <span style="font-size:12px;color:var(--text2)">6 agents running</span>
+      <div class="web-nav-inbox">4 decisions</div>
+    </div>
+  </div>
+
+  <div class="web-body">
+    <div class="web-project-header">
+      <h1>Payments Rewrite</h1>
+      <div class="sub">3 repos · 12 objectives · 6/14 complete</div>
+    </div>
+
+    <div class="web-columns">
+      <div class="web-column">
+        <h3>In progress</h3>
+
+        <div class="web-obj-card">
+          <h4>Migrate to Stripe v3</h4>
+          <div class="obj-sub">4 agents · 6/10 sub-objectives</div>
+          <div class="streaming-bar"></div>
+          <div class="web-obj-children">
+            <div class="web-obj-child"><span>API endpoints</span><span class="badge running">●●○○</span></div>
+            <div class="web-obj-child"><span>Webhooks</span><span class="badge waiting">⚠ waiting</span></div>
+            <div class="web-obj-child"><span>Tests</span><span class="badge running">3/8</span></div>
+          </div>
+        </div>
+
+        <div class="web-obj-card">
+          <h4>Invoice PDF generation</h4>
+          <div class="obj-sub">2 agents · streaming</div>
+          <div class="streaming-bar" style="margin-top:8px"></div>
+        </div>
+      </div>
+
+      <div class="web-column">
+        <h3>Needs attention</h3>
+
+        <div class="web-decision-card">
+          <div class="source">Stripe v3 › Webhooks</div>
+          <div class="question">"Implement idempotency keys for webhook retries?"</div>
+          <div class="web-decision-btns">
+            <button class="web-decision-btn">Yes, add it</button>
+            <button class="web-decision-btn">Skip</button>
+          </div>
+        </div>
+
+        <div class="web-decision-card">
+          <div class="source">Stripe v3 › API endpoints</div>
+          <div class="question">"Return paymentIntent ID or compat layer?"</div>
+          <div class="web-decision-btns">
+            <button class="web-decision-btn">New ID</button>
+            <button class="web-decision-btn">Compat layer</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="web-column">
+        <h3>Done</h3>
+
+        <div class="web-obj-card" style="opacity:0.7">
+          <h4 style="color:var(--green)">✓ Refund flow</h4>
+          <div class="obj-sub">3 sub-objectives · completed 13:45</div>
+        </div>
+        <div class="web-obj-card" style="opacity:0.7">
+          <h4 style="color:var(--green)">✓ DB migration</h4>
+          <div class="obj-sub">migration_012.sql applied</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- CLI -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div id="view-cli" class="platform-view">
+<style>
+  .cli-frame {
+    max-width: 820px; margin: 20px auto; border-radius: 12px;
+    border: 1px solid var(--border); overflow: hidden; background: #0d0d0d;
+  }
+  .cli-titlebar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a;
+  }
+  .cli-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .cli-dot.r { background: #ff5f57; }
+  .cli-dot.y { background: #febc2e; }
+  .cli-dot.g { background: #28c840; }
+  .cli-titlebar-text { font-size: 12px; color: #666; margin-left: 8px; font-family: 'SF Mono', monospace; }
+  .cli-body {
+    padding: 20px; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 13px; line-height: 1.7; min-height: 600px;
+  }
+  .cli-prompt { color: #8888ff; }
+  .cli-cmd { color: #e8e8e8; }
+  .cli-dim { color: #555; }
+  .cli-green { color: #22c55e; }
+  .cli-yellow { color: #eab308; }
+  .cli-red { color: #ef4444; }
+  .cli-blue { color: #818cf8; }
+  .cli-cyan { color: #22d3ee; }
+  .cli-bold { font-weight: 700; }
+  .cli-bar-done { color: #22c55e; }
+  .cli-bar-active { color: #818cf8; }
+  .cli-bar-empty { color: #333; }
+  .cli-block { margin-bottom: 20px; }
+  .cli-indent { padding-left: 20px; }
+  .cli-separator { color: #333; }
+</style>
+
+<div class="cli-frame">
+  <div class="cli-titlebar">
+    <div class="cli-dot r"></div>
+    <div class="cli-dot y"></div>
+    <div class="cli-dot g"></div>
+    <div class="cli-titlebar-text">agent — zsh — 120×40</div>
+  </div>
+  <div class="cli-body">
+
+<div class="cli-block">
+<span class="cli-prompt">❯</span> <span class="cli-cmd">agent projects</span><br>
+<br>
+<span class="cli-dim">PROJECT</span>              <span class="cli-dim">REPOS</span>  <span class="cli-dim">PROGRESS</span>        <span class="cli-dim">STATUS</span><br>
+<span class="cli-bold">Payments Rewrite</span>     3      <span class="cli-bar-done">██████</span><span class="cli-bar-active">██</span><span class="cli-bar-empty">██████</span> 6/14   <span class="cli-yellow">2 waiting</span><br>
+<span class="cli-bold">Mobile App v3</span>        1      <span class="cli-bar-done">████████████████</span> done   <span class="cli-green">✓</span><br>
+<span class="cli-bold">Infra Migration</span>      2      <span class="cli-bar-done">████</span><span class="cli-bar-active">██</span><span class="cli-bar-empty">██████████</span> 3/10   <span class="cli-red">1 error</span><br>
+</div>
+
+<div class="cli-block">
+<span class="cli-prompt">❯</span> <span class="cli-cmd">agent focus "payments"</span><br>
+<br>
+<span class="cli-bold">Payments Rewrite</span> <span class="cli-dim">— 3 repos · 12 objectives</span><br>
+<br>
+<span class="cli-blue">├──</span> <span class="cli-bold">Migrate to Stripe v3</span> <span class="cli-dim">[6/10]</span><br>
+<span class="cli-blue">│</span>   <span class="cli-dim">├──</span> API endpoints      <span class="cli-blue">●●</span><span class="cli-dim">○○</span>  <span class="cli-dim">POST /pay in progress</span><br>
+<span class="cli-blue">│</span>   <span class="cli-dim">├──</span> Webhooks           <span class="cli-yellow">⚠ waiting on you</span><br>
+<span class="cli-blue">│</span>   <span class="cli-dim">├──</span> DB migration       <span class="cli-green">✓ done</span><br>
+<span class="cli-blue">│</span>   <span class="cli-dim">└──</span> Tests              <span class="cli-blue">●●●</span><span class="cli-dim">○○○○○</span>  <span class="cli-dim">3/8</span><br>
+<span class="cli-blue">├──</span> <span class="cli-green">Refund flow ✓</span><br>
+<span class="cli-blue">└──</span> <span class="cli-bold">Invoice PDF gen</span> <span class="cli-cyan">streaming…</span><br>
+</div>
+
+<div class="cli-block">
+<span class="cli-prompt">❯</span> <span class="cli-cmd">agent inbox</span><br>
+<br>
+<span class="cli-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span><br>
+<span class="cli-dim">1/4</span>  <span class="cli-dim">Payments › Stripe v3 › Webhooks</span><br>
+<br>
+<span class="cli-bold">coder asks:</span> "Stripe sends retry headers on failed<br>
+webhook deliveries. Should I implement idempotency<br>
+keys to prevent duplicate processing?"<br>
+<br>
+<span class="cli-dim">  webhook.js:34 — processes every delivery without</span><br>
+<span class="cli-dim">  checking for duplicates</span><br>
+<br>
+  <span class="cli-green">[y]</span> yes, add idempotency   <span class="cli-red">[n]</span> no, skip<br>
+  <span class="cli-blue">[d]</span> show diff               <span class="cli-dim">[s]</span> skip for now<br>
+<span class="cli-dim">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span><br>
+<br>
+<span class="cli-prompt">decision❯</span> <span class="cli-cmd">y▌</span><br>
+</div>
+
+  </div>
+</div>
+</div>
+
+<script>
+function switchPlatform(name) {
+  document.querySelectorAll('.platform-view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.platform-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function ipadScreen(name) {
+  document.querySelectorAll('#view-ipad .ipad-screen-content').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('#view-ipad .ipad-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('ipad-' + name).classList.add('active');
+  const tabs = document.querySelectorAll('#view-ipad .ipad-tab');
+  const idx = { projects: 0, map: 1, focus: 2 }[name];
+  if (tabs[idx]) tabs[idx].classList.add('active');
+
+  const titles = { projects: 'Projects', map: 'Payments Rewrite', focus: 'POST /pay' };
+  document.getElementById('ipad-title').textContent = titles[name] || name;
+}
+
+function toggleInbox() {
+  const el = document.getElementById('inbox-overlay');
+  el.classList.toggle('visible');
+}
+</script>
+
+</body>
+</html>

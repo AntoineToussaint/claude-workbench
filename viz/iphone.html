@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>NEXUS — iPhone</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#06060c;--bg2:#0a0a14;--sf:#0f0f1a;--sf2:#151525;--sf3:#1a1a2e;
+  --b1:#1e1e35;--b2:#2a2a45;
+  --t1:#e4e4f0;--t2:#7878a0;--t3:#4a4a6a;
+  --ac:#6366f1;--ac2:#818cf8;
+  --g:#22c55e;--r:#ef4444;--y:#eab308;--o:#f97316;--c:#22d3ee;--p:#a855f7;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--t1);font-family:'Inter',system-ui,sans-serif;max-width:430px;margin:0 auto}
+
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+.safe-top{height:env(safe-area-inset-top);min-height:20px;background:var(--bg2);flex-shrink:0}
+
+/* Tab bar */
+.tab-bar{
+  display:flex;padding:6px 0 calc(6px + env(safe-area-inset-bottom));
+  background:rgba(15,15,26,0.85);border-top:1px solid var(--b1);flex-shrink:0;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+}
+.tab{flex:1;text-align:center;padding:4px 0;cursor:pointer;position:relative}
+.tab-icon{font-size:20px;display:block;color:var(--t3)}
+.tab-label{font-size:9px;font-weight:500;color:var(--t3)}
+.tab.active .tab-icon,.tab.active .tab-label{color:var(--ac2)}
+.tab-badge{
+  position:absolute;top:0;right:calc(50% - 16px);min-width:16px;height:16px;
+  border-radius:8px;background:var(--r);color:#fff;font-size:9px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;padding:0 4px;
+}
+
+.screen{display:none;flex:1;overflow:hidden;flex-direction:column}
+.screen.active{display:flex}
+.screen-header{padding:12px 16px 8px;background:var(--bg2);border-bottom:1px solid var(--b1);flex-shrink:0}
+.screen-header h1{font-size:22px;font-weight:800;letter-spacing:-0.5px}
+.screen-header .sub{font-size:11px;color:var(--t2);margin-top:1px}
+.screen-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px 16px}
+
+.badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:9px;font-weight:600}
+.badge-run{background:rgba(99,102,241,0.12);color:var(--ac2)}
+.badge-wait{background:rgba(234,179,8,0.12);color:var(--y)}
+.badge-done{background:rgba(34,197,94,0.12);color:var(--g)}
+.badge-err{background:rgba(239,68,68,0.12);color:var(--r)}
+
+.stream{height:2px;border-radius:1px;background:linear-gradient(90deg,transparent,var(--ac),var(--ac2),transparent);background-size:200% 100%;animation:s 2s linear infinite}
+@keyframes s{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.section-title{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:1.5px;margin:14px 0 8px}
+
+/* ═══════ INBOX (HOME) — decision-first ═══════ */
+.decision-card{
+  padding:16px;border-radius:14px;margin-bottom:10px;
+  background:var(--sf);border:1px solid var(--b1);
+  position:relative;overflow:hidden;
+  transition:transform .3s,opacity .3s;
+  touch-action:pan-y;
+}
+.decision-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.decision-card.deploy::before{background:var(--y)}
+.decision-card.arch::before{background:var(--p)}
+.decision-card.conflict::before{background:var(--r)}
+.decision-card.scope::before{background:var(--ac)}
+
+.dc-type{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.dc-type.deploy{color:var(--y)}.dc-type.arch{color:var(--p)}.dc-type.conflict{color:var(--r)}.dc-type.scope{color:var(--ac2)}
+.dc-source{font-size:10px;color:var(--t3);margin-bottom:6px}
+.dc-q{font-size:15px;font-weight:500;line-height:1.4;margin-bottom:12px}
+
+.dc-evidence{display:flex;gap:6px;margin-bottom:12px}
+.dc-ev{flex:1;padding:6px;border-radius:6px;background:var(--bg2);text-align:center}
+.dc-ev-val{font-size:14px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.dc-ev-label{font-size:8px;color:var(--t3);margin-top:1px}
+
+.dc-btns{display:flex;gap:8px}
+.dc-btn{
+  flex:1;padding:11px;border-radius:10px;font-size:13px;font-weight:600;
+  border:none;cursor:pointer;text-align:center;transition:transform .1s;
+}
+.dc-btn:active{transform:scale(.95)}
+.dc-btn.left{background:rgba(239,68,68,0.08);color:var(--r)}
+.dc-btn.right{background:rgba(34,197,94,0.08);color:var(--g)}
+
+/* ═══════ STATUS — quick glance ═══════ */
+.status-pulse{
+  display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;
+  background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.08);margin-bottom:12px;
+}
+.pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--g);animation:pulse 2s infinite}
+.pulse-text{font-size:11px;color:var(--g)}
+
+.obj-row{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.03);
+  cursor:pointer;
+}
+.obj-row:active{opacity:.7}
+.obj-indicator{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.obj-info{flex:1}
+.obj-name{font-size:14px;font-weight:500}
+.obj-detail{font-size:11px;color:var(--t2);margin-top:1px}
+
+/* ═══════ FOCUS (single obj, full screen) ═══════ */
+.focus-back{font-size:13px;color:var(--ac2);margin-bottom:4px;cursor:pointer}
+
+.agent-row{
+  display:flex;align-items:center;gap:10px;padding:10px 0;
+  border-bottom:1px solid rgba(255,255,255,0.03);
+}
+.agent-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.agent-info{flex:1}
+.agent-name{font-size:13px;font-weight:600}
+.agent-st{font-size:11px;color:var(--t2);margin-top:1px}
+.agent-badge{font-size:10px}
+
+.deploy-mini{
+  padding:12px;border-radius:10px;background:var(--sf);border:1px solid var(--b1);margin-bottom:10px;
+}
+.dm-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.dm-title{font-size:13px;font-weight:600}
+.dm-metrics{display:flex;gap:12px;margin-bottom:8px}
+.dm-m{text-align:center;flex:1}
+.dm-m-val{font-size:16px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.dm-m-label{font-size:9px;color:var(--t3)}
+.canary-bar{height:4px;background:var(--bg);border-radius:2px;overflow:hidden;margin-bottom:8px}
+.canary-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--y),var(--o));background-size:200% 100%;animation:cp 2s linear infinite}
+@keyframes cp{0%{background-position:0% 0}100%{background-position:200% 0}}
+.dm-btns{display:flex;gap:6px}
+.dm-btn{
+  flex:1;padding:10px;border-radius:8px;font-size:12px;font-weight:600;
+  border:1px solid var(--b1);background:var(--sf2);color:var(--t1);
+  cursor:pointer;text-align:center;
+}
+.dm-btn:active{transform:scale(.97)}
+.dm-btn.primary{background:var(--g);border-color:var(--g);color:#000}
+.dm-btn.danger{background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.15);color:var(--r)}
+
+.tl{padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.03);display:flex;gap:8px;font-size:12px}
+.tl-time{font-size:9px;color:var(--t3);font-family:'JetBrains Mono',monospace;min-width:32px;padding-top:2px}
+.tl-body{flex:1}
+.tl-body strong{font-weight:600}
+.tl-btns{display:flex;gap:6px;margin-top:6px}
+.tl-btn{
+  padding:7px 14px;border-radius:8px;font-size:11px;font-weight:500;
+  border:1px solid var(--b1);background:var(--sf2);color:var(--t1);cursor:pointer;
+}
+.tl-btn:active{transform:scale(.97)}
+.tl-btn.primary{background:var(--ac);border-color:var(--ac)}
+
+/* ═══════ SPARKLINE ═══════ */
+.spark-row{display:flex;gap:8px;margin-bottom:10px}
+.spark-card{flex:1;padding:10px;border-radius:10px;background:var(--sf);border:1px solid var(--b1)}
+.spark-label{font-size:10px;color:var(--t3);margin-bottom:4px}
+.spark-val{font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace;margin-bottom:4px}
+.spark-val.good{color:var(--g)}
+.spark-chart{height:24px;background:var(--bg2);border-radius:4px;overflow:hidden}
+.spark-chart svg{width:100%;height:100%}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="safe-top"></div>
+
+<!-- ═══════ HOME (inbox-first) ═══════ -->
+<div class="screen active" id="s-home">
+  <div class="screen-header">
+    <h1>NEXUS</h1>
+    <div class="sub">14 agents · 3 projects</div>
+  </div>
+  <div class="screen-body">
+    <div class="status-pulse"><div class="pulse-dot"></div><div class="pulse-text">All systems nominal</div></div>
+
+    <div class="section-title">Needs you (4)</div>
+
+    <div class="decision-card deploy">
+      <div class="dc-type deploy">⚡ Deploy gate</div>
+      <div class="dc-source">Payments › Stripe v3</div>
+      <div class="dc-q">Canary at 5% for 15min. Promote to 25%?</div>
+      <div class="dc-evidence">
+        <div class="dc-ev"><div class="dc-ev-val" style="color:var(--g)">31ms</div><div class="dc-ev-label">p99</div></div>
+        <div class="dc-ev"><div class="dc-ev-val" style="color:var(--g)">0.01%</div><div class="dc-ev-label">errors</div></div>
+        <div class="dc-ev"><div class="dc-ev-val" style="color:var(--g)">99.3%</div><div class="dc-ev-label">success</div></div>
+      </div>
+      <div class="dc-btns">
+        <button class="dc-btn left">Hold</button>
+        <button class="dc-btn right">Promote →</button>
+      </div>
+    </div>
+
+    <div class="decision-card arch">
+      <div class="dc-type arch">◆ Architecture</div>
+      <div class="dc-source">Stripe v3 › coder-api</div>
+      <div class="dc-q">Return paymentIntent ID or keep compat layer?</div>
+      <div class="dc-btns">
+        <button class="dc-btn left">Compat</button>
+        <button class="dc-btn right">New ID →</button>
+      </div>
+    </div>
+
+    <div class="decision-card conflict">
+      <div class="dc-type conflict">⚠ Conflict</div>
+      <div class="dc-source">Lock Manager</div>
+      <div class="dc-q">Pricing redesign needs billing/**. Allow concurrent access?</div>
+      <div class="dc-btns">
+        <button class="dc-btn left">Queue</button>
+        <button class="dc-btn right">Allow →</button>
+      </div>
+    </div>
+
+    <div class="decision-card scope">
+      <div class="dc-type scope">◎ Scope expand</div>
+      <div class="dc-source">Stripe v3 › coder-api</div>
+      <div class="dc-q">Webhook fix needs queue/ changes. Approve?</div>
+      <div class="dc-btns">
+        <button class="dc-btn left">Deny</button>
+        <button class="dc-btn right">Approve →</button>
+      </div>
+    </div>
+
+    <div class="section-title">Active objectives</div>
+
+    <div class="obj-row" onclick="go('s-focus')">
+      <div class="obj-indicator" style="background:var(--ac2)"></div>
+      <div class="obj-info">
+        <div class="obj-name">Migrate to Stripe v3</div>
+        <div class="obj-detail">5 agents · canary 5% · 6/10</div>
+      </div>
+      <span class="badge badge-run">canary</span>
+    </div>
+    <div class="obj-row">
+      <div class="obj-indicator" style="background:var(--ac)"></div>
+      <div class="obj-info">
+        <div class="obj-name">Invoice PDF generation</div>
+        <div class="obj-detail">2 agents · streaming</div>
+      </div>
+      <span class="badge badge-run">coding</span>
+    </div>
+    <div class="obj-row">
+      <div class="obj-indicator" style="background:var(--ac)"></div>
+      <div class="obj-info">
+        <div class="obj-name">Auth system v2</div>
+        <div class="obj-detail">3 agents · testing</div>
+      </div>
+      <span class="badge badge-run">testing</span>
+    </div>
+    <div class="obj-row">
+      <div class="obj-indicator" style="background:var(--y)"></div>
+      <div class="obj-info">
+        <div class="obj-name">Pricing page redesign</div>
+        <div class="obj-detail">blocked on Stripe billing</div>
+      </div>
+      <span class="badge badge-wait">blocked</span>
+    </div>
+    <div class="obj-row">
+      <div class="obj-indicator" style="background:var(--g)"></div>
+      <div class="obj-info">
+        <div class="obj-name">Refund flow</div>
+        <div class="obj-detail">deployed 11:30</div>
+      </div>
+      <span class="badge badge-done">✓</span>
+    </div>
+
+    <div style="height:20px"></div>
+  </div>
+</div>
+
+<!-- ═══════ FOCUS ═══════ -->
+<div class="screen" id="s-focus">
+  <div class="screen-header">
+    <div class="focus-back" onclick="go('s-home')">← Back</div>
+    <h1>Stripe v3</h1>
+    <div class="sub">5 agents · canary 5%</div>
+  </div>
+  <div class="screen-body">
+
+    <div class="section-title">Deploy</div>
+    <div class="deploy-mini">
+      <div class="dm-head"><div class="dm-title">Canary → v2.35.0</div><span class="badge badge-wait" style="font-size:9px">5% → 25%</span></div>
+      <div class="dm-metrics">
+        <div class="dm-m"><div class="dm-m-val" style="color:var(--g)">31ms</div><div class="dm-m-label">p99</div></div>
+        <div class="dm-m"><div class="dm-m-val" style="color:var(--g)">0.01%</div><div class="dm-m-label">errors</div></div>
+        <div class="dm-m"><div class="dm-m-val" style="color:var(--g)">99.3%</div><div class="dm-m-label">success</div></div>
+      </div>
+      <div class="canary-bar"><div class="canary-fill" style="width:85%"></div></div>
+      <div class="dm-btns">
+        <button class="dm-btn primary">Promote</button>
+        <button class="dm-btn">Hold</button>
+        <button class="dm-btn danger">Rollback</button>
+      </div>
+    </div>
+
+    <div class="section-title">Agents</div>
+    <div class="agent-row">
+      <div class="agent-dot" style="background:var(--g)"></div>
+      <div class="agent-info"><div class="agent-name">architect</div><div class="agent-st">Schema done</div></div>
+      <span style="color:var(--g);font-size:11px">✓</span>
+    </div>
+    <div class="agent-row">
+      <div class="agent-dot" style="background:var(--ac2);animation:pulse 1.5s infinite"></div>
+      <div class="agent-info"><div class="agent-name">coder-api</div><div class="agent-st">Editing pay.js</div></div>
+      <span style="color:var(--ac2);font-size:11px">●</span>
+    </div>
+    <div class="agent-row">
+      <div class="agent-dot" style="background:var(--ac2);animation:pulse 1.5s infinite"></div>
+      <div class="agent-info"><div class="agent-name">coder-ui</div><div class="agent-st">Checkout form</div></div>
+      <span style="color:var(--ac2);font-size:11px">●</span>
+    </div>
+    <div class="agent-row">
+      <div class="agent-dot" style="background:var(--y)"></div>
+      <div class="agent-info"><div class="agent-name">tester</div><div class="agent-st">Waiting · 3/8 passing</div></div>
+      <span style="color:var(--y);font-size:11px">⚠</span>
+    </div>
+    <div class="agent-row">
+      <div class="agent-dot" style="background:var(--g);animation:pulse 2s infinite"></div>
+      <div class="agent-info"><div class="agent-name">deployer</div><div class="agent-st">Watching canary · 12min</div></div>
+      <span style="color:var(--g);font-size:11px">●</span>
+    </div>
+
+    <div class="section-title">Metrics</div>
+    <div class="spark-row">
+      <div class="spark-card">
+        <div class="spark-label">p99 latency</div>
+        <div class="spark-val good">31ms</div>
+        <div class="spark-chart">
+          <svg viewBox="0 0 120 24" preserveAspectRatio="none">
+            <path d="M0,14 C15,13 30,15 45,14 C60,12 75,11 90,14 C100,16 110,14 120,13" stroke="var(--g)" stroke-width="1.5" fill="none"/>
+          </svg>
+        </div>
+      </div>
+      <div class="spark-card">
+        <div class="spark-label">error rate</div>
+        <div class="spark-val good">0.01%</div>
+        <div class="spark-chart">
+          <svg viewBox="0 0 120 24" preserveAspectRatio="none">
+            <path d="M0,20 C30,20 60,20 90,19 C105,20 120,20 120,20" stroke="var(--g)" stroke-width="1.5" fill="none"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Timeline</div>
+    <div class="tl"><div class="tl-time">14:12</div><div class="tl-body"><strong style="color:var(--g)">deployer</strong> — Canary stable. Promote?<div class="tl-btns"><button class="tl-btn primary">Promote</button><button class="tl-btn">Hold</button></div></div></div>
+    <div class="tl"><div class="tl-time">14:07</div><div class="tl-body"><strong style="color:var(--ac2)">coder-api</strong> — Return new ID or compat?<div class="tl-btns"><button class="tl-btn primary">New ID</button><button class="tl-btn">Compat</button></div></div></div>
+    <div class="tl"><div class="tl-time">14:05</div><div class="tl-body"><strong style="color:var(--r)">tester</strong> — currency conversion failed at pay.js:42</div></div>
+    <div class="tl"><div class="tl-time">14:03</div><div class="tl-body"><strong style="color:var(--ac2)">coder-api</strong> — charges → paymentIntents</div></div>
+    <div class="tl"><div class="tl-time">14:00</div><div class="tl-body"><strong style="color:var(--g)">deployer</strong> — canary 5% deployed</div></div>
+
+    <div style="height:20px"></div>
+  </div>
+</div>
+
+<!-- ═══════ HEALTH ═══════ -->
+<div class="screen" id="s-health">
+  <div class="screen-header">
+    <h1>Health</h1>
+    <div class="sub">All services</div>
+  </div>
+  <div class="screen-body">
+    <div class="status-pulse"><div class="pulse-dot"></div><div class="pulse-text">All nominal · 99.98% uptime</div></div>
+
+    <div class="spark-row">
+      <div class="spark-card">
+        <div class="spark-label">api-gateway p99</div>
+        <div class="spark-val good">31ms</div>
+        <div class="spark-chart"><svg viewBox="0 0 120 24" preserveAspectRatio="none"><path d="M0,14 C20,13 40,15 60,14 C80,12 90,8 100,10 C110,11 120,10 120,10" stroke="var(--g)" stroke-width="1.5" fill="none"/></svg></div>
+      </div>
+      <div class="spark-card">
+        <div class="spark-label">errors</div>
+        <div class="spark-val good">0.01%</div>
+        <div class="spark-chart"><svg viewBox="0 0 120 24" preserveAspectRatio="none"><path d="M0,20 C40,20 80,20 100,19 C110,20 120,20 120,20" stroke="var(--g)" stroke-width="1.5" fill="none"/></svg></div>
+      </div>
+    </div>
+
+    <div class="section-title">Services</div>
+    <div class="obj-row">
+      <div class="obj-indicator" style="background:var(--y)"></div>
+      <div class="obj-info"><div class="obj-name">api-gateway</div><div class="obj-detail">v2.34.1 → v2.35.0 · canary 5%</div></div>
+      <span class="badge badge-wait">canary</span>
+    </div>
+    <div class="obj-row">
+      <div class="obj-indicator" style="background:var(--g)"></div>
+      <div class="obj-info"><div class="obj-name">payment-service</div><div class="obj-detail">v3.12.0 · p99: 18ms</div></div>
+      <span class="badge badge-done">✓</span>
+    </div>
+    <div class="obj-row">
+      <div class="obj-indicator" style="background:var(--g)"></div>
+      <div class="obj-info"><div class="obj-name">postgres-primary</div><div class="obj-detail">84/200 conns · 4ms query p99</div></div>
+      <span class="badge badge-done">✓</span>
+    </div>
+    <div class="obj-row">
+      <div class="obj-indicator" style="background:var(--g)"></div>
+      <div class="obj-info"><div class="obj-name">event-queue</div><div class="obj-detail">depth: 342 · 8 consumers</div></div>
+      <span class="badge badge-done">✓</span>
+    </div>
+
+    <div class="section-title">Active deploys</div>
+    <div class="deploy-mini">
+      <div class="dm-head"><div class="dm-title">Stripe billing → api-gateway</div><span class="badge badge-wait" style="font-size:9px">canary 5%</span></div>
+      <div class="canary-bar"><div class="canary-fill" style="width:85%"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--t3)"><span style="color:var(--g)">5% ✓</span><span style="color:var(--y);font-weight:600">→ 25%</span><span>50%</span><span>100%</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ TAB BAR ═══════ -->
+<div class="tab-bar">
+  <div class="tab active" onclick="go('s-home')"><span class="tab-icon">▣</span><span class="tab-label">Home</span><div class="tab-badge">4</div></div>
+  <div class="tab" onclick="go('s-focus')"><span class="tab-icon">◈</span><span class="tab-label">Focus</span></div>
+  <div class="tab" onclick="go('s-health')"><span class="tab-icon">◇</span><span class="tab-label">Health</span></div>
+</div>
+</div>
+
+<script>
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  const map={'s-home':0,'s-focus':1,'s-health':2};
+  document.querySelectorAll('.tab')[map[id]]?.classList.add('active');
+}
+</script>
+</body>
+</html>
