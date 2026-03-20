@@ -199,6 +199,21 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.env-pr-title {
+  font-size: 11px;
+  color: var(--color-purple);
+  text-decoration: none;
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+.env-pr-title:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
 
 .env-local-badge {
   font-size: 8px;

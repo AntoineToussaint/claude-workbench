@@ -71,10 +71,11 @@ app.get("/api/config", async (_req, res) => {
     saveConfig({ ...config, launchers });
   }
 
-  const muxType = detectMultiplexer();
+  const muxOverride = config.multiplexer ?? "auto";
+  const muxType = muxOverride === "auto" ? detectMultiplexer() : muxOverride;
   let muxCapabilities = { stateDetection: false, notifications: false, embeddedBrowser: false, splitPanes: false };
   try {
-    const mux = await getMultiplexer();
+    const mux = await getMultiplexer(muxOverride);
     muxCapabilities = mux.getCapabilities();
   } catch {}
 

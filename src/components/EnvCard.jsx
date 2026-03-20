@@ -76,6 +76,11 @@ export const EnvCard = memo(function EnvCard({ color, env, launchers, status, mu
             <div className="env-repo-tag">{env.repoId}</div>
           )}
           <div className="env-branch">{env.branch}</div>
+          {status?.pr && !merged && (
+            <a className="env-pr-title" href={status.pr.url} target="_blank" rel="noreferrer" onPointerDown={(e) => e.stopPropagation()}>
+              PR #{status.pr.number}: {status.pr.title}
+            </a>
+          )}
 
           {merged && (
             <div className="env-merged">

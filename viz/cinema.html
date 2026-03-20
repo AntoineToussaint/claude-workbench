@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS — The Future of Engineering</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #06060c;
+  --bg2: #0a0a14;
+  --surface: #0f0f1a;
+  --surface2: #151525;
+  --surface3: #1a1a2e;
+  --border: #1e1e35;
+  --border2: #2a2a45;
+  --text: #e4e4f0;
+  --text2: #7878a0;
+  --text3: #4a4a6a;
+  --accent: #6366f1;
+  --accent2: #818cf8;
+  --accent3: #a5b4fc;
+  --green: #22c55e;
+  --green2: #4ade80;
+  --red: #ef4444;
+  --yellow: #eab308;
+  --orange: #f97316;
+  --cyan: #22d3ee;
+  --pink: #ec4899;
+  --purple: #a855f7;
+}
+html { scroll-behavior: smooth; scroll-snap-type: y mandatory; overflow-y: scroll; overflow-x: hidden; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, system-ui, sans-serif; }
+
+/* ── Scene system ── */
+.scene {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  scroll-snap-align: start; position: relative; overflow: hidden;
+  flex-direction: column; padding: 40px;
+}
+
+/* ── Navigation ── */
+.nav-dots {
+  position: fixed; right: 24px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 10px; z-index: 100;
+}
+.nav-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--border2);
+  cursor: pointer; transition: all 0.3s;
+}
+.nav-dot.active { background: var(--accent); transform: scale(1.4); box-shadow: 0 0 12px rgba(99,102,241,0.5); }
+.nav-dot:hover { background: var(--accent2); }
+
+.scene-counter {
+  position: fixed; bottom: 24px; right: 24px; font-size: 11px; color: var(--text3);
+  z-index: 100; font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Shared ── */
+.fade-up {
+  opacity: 0; transform: translateY(40px);
+  animation: fadeUp 0.8s ease forwards;
+}
+@keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+.delay-1 { animation-delay: 0.2s; }
+.delay-2 { animation-delay: 0.4s; }
+.delay-3 { animation-delay: 0.6s; }
+.delay-4 { animation-delay: 0.8s; }
+.delay-5 { animation-delay: 1.0s; }
+
+.scene-label {
+  font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase;
+  letter-spacing: 3px; margin-bottom: 16px;
+}
+.scene-title {
+  font-size: clamp(32px, 5vw, 56px); font-weight: 800; letter-spacing: -1.5px;
+  line-height: 1.15; text-align: center; max-width: 900px;
+}
+.scene-subtitle {
+  font-size: clamp(16px, 2vw, 20px); color: var(--text2); text-align: center;
+  max-width: 700px; line-height: 1.6; margin-top: 16px;
+}
+.highlight { color: var(--accent2); }
+.highlight-green { color: var(--green); }
+.highlight-yellow { color: var(--yellow); }
+.highlight-pink { color: var(--pink); }
+.highlight-purple { color: var(--purple); }
+.highlight-cyan { color: var(--cyan); }
+
+/* ═══════════════════════════════════════════════ */
+/* SCENE 1: TITLE                                  */
+/* ═══════════════════════════════════════════════ */
+#scene-title {
+  background: radial-gradient(ellipse at center, rgba(99,102,241,0.06) 0%, var(--bg) 70%);
+}
+.title-logo {
+  width: 80px; height: 80px; border-radius: 20px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32px; font-weight: 900; color: white;
+  margin-bottom: 32px;
+  box-shadow: 0 0 60px rgba(99,102,241,0.3), 0 0 120px rgba(99,102,241,0.1);
+  animation: logoPulse 4s ease-in-out infinite;
+}
+@keyframes logoPulse {
+  0%,100% { box-shadow: 0 0 60px rgba(99,102,241,0.3), 0 0 120px rgba(99,102,241,0.1); }
+  50% { box-shadow: 0 0 80px rgba(99,102,241,0.5), 0 0 160px rgba(99,102,241,0.2); }
+}
+.title-main {
+  font-size: clamp(48px, 7vw, 80px); font-weight: 900; letter-spacing: -3px;
+  background: linear-gradient(135deg, var(--text), var(--accent2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: 12px;
+}
+.title-sub {
+  font-size: clamp(14px, 1.5vw, 18px); color: var(--text3); letter-spacing: 6px;
+  text-transform: uppercase; margin-bottom: 48px;
+}
+.title-year {
+  font-size: 120px; font-weight: 900; color: rgba(99,102,241,0.06);
+  position: absolute; bottom: 40px; font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -5px;
+}
+
+/* ═══════════════════════════════════════════════ */
+/* SCENE 2: THE PROBLEM                            */
+/* ═══════════════════════════════════════════════ */
+#scene-problem { background: var(--bg); }
+.chaos-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  max-width: 800px; margin-top: 32px; opacity: 0.7;
+}
+.chaos-item {
+  padding: 10px 14px; border-radius: 8px; font-size: 11px;
+  border: 1px solid var(--border); background: var(--surface);
+  animation: chaosFloat 3s ease-in-out infinite;
+}
+.chaos-item:nth-child(odd) { animation-delay: -1.5s; }
+.chaos-item.pr { border-left: 3px solid var(--green); }
+.chaos-item.slack { border-left: 3px solid var(--pink); }
+.chaos-item.jira { border-left: 3px solid var(--cyan); }
+.chaos-item.alert { border-left: 3px solid var(--red); }
+@keyframes chaosFloat {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.problem-stats {
+  display: flex; gap: 40px; margin-top: 40px;
+}
+.problem-stat { text-align: center; }
+.problem-stat-value {
+  font-size: 36px; font-weight: 800; font-family: 'JetBrains Mono', monospace;
+  color: var(--red);
+}
+.problem-stat-label { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+/* ═══════════════════════════════════════════════ */
+/* SCENE 3: ONE COMMAND                            */
+/* ═══════════════════════════════════════════════ */
+#scene-start {
+  background: radial-gradient(ellipse at center, rgba(34,197,94,0.04) 0%, var(--bg) 70%);
+}
+.terminal-window {
+  width: 600px; border-radius: 12px; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border);
+  box-shadow: 0 20px 80px rgba(0,0,0,0.5); margin-top: 32px;
+}
+.terminal-bar {
+  height: 36px; background: var(--surface2); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 12px; gap: 6px;
+}
+.terminal-dot { width: 10px; height: 10px; border-radius: 50%; }
+.terminal-body {
+  padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: 14px; line-height: 1.8;
+}
+.terminal-prompt { color: var(--green); }
+.terminal-cmd { color: var(--text); }
+.terminal-cursor {
+  display: inline-block; width: 8px; height: 16px; background: var(--accent);
+  animation: blink 1s step-end infinite; vertical-align: middle;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ═══════════════════════════════════════════════ */
+/* MONITOR FRAMES                                  */
+/* ═══════════════════════════════════════════════ */
+.monitor-frame {
+  border-radius: 16px; overflow: hidden;
+  border: 2px solid var(--border2); background: var(--bg);
+  box-shadow: 0 20px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03);
+  position: relative;
+}
+.monitor-frame.large { width: min(1100px, 90vw); height: min(650px, 70vh); }
+.monitor-frame.medium { width: min(540px, 44vw); height: min(380px, 42vh); }
+.monitor-frame.small { width: min(360px, 30vw); height: min(260px, 30vh); }
+.monitor-stand { width: 60px; height: 20px; background: var(--border); margin: 0 auto; border-radius: 0 0 8px 8px; }
+.monitor-base { width: 120px; height: 6px; background: var(--border2); margin: 0 auto; border-radius: 3px; }
+.monitor-frame .monitor-label {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  font-size: 9px; color: var(--text3); background: rgba(6,6,12,0.8);
+  padding: 2px 8px; border-radius: 4px; z-index: 10; backdrop-filter: blur(4px);
+}
+
+/* ═══════════════════════════════════════════════ */
+/* MINI NEXUS UI                                   */
+/* ═══════════════════════════════════════════════ */
+.mini-nexus { width: 100%; height: 100%; display: flex; font-size: 11px; background: var(--bg); }
+.mn-rail {
+  width: 40px; background: var(--surface); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; align-items: center; padding: 10px 0; gap: 4px;
+}
+.mn-rail-logo {
+  width: 24px; height: 24px; border-radius: 6px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 800; color: white; margin-bottom: 8px;
+}
+.mn-rail-btn {
+  width: 28px; height: 28px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--text3);
+}
+.mn-rail-btn.active { background: rgba(99,102,241,0.15); color: var(--accent2); }
+.mn-sessions {
+  width: 200px; background: var(--bg2); border-right: 1px solid var(--border);
+  overflow: hidden; padding: 8px;
+}
+.mn-session-title { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; padding: 6px 4px; }
+.mn-session { padding: 6px 8px; border-radius: 6px; margin-bottom: 3px; font-size: 10px; }
+.mn-session.active { background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.2); }
+.mn-session-name { font-weight: 600; margin-bottom: 2px; }
+.mn-session-meta { font-size: 9px; color: var(--text2); }
+.mn-session-bar { height: 2px; background: var(--surface3); border-radius: 1px; margin-top: 4px; }
+.mn-session-fill { height: 100%; border-radius: 1px; }
+.mn-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.mn-topbar {
+  height: 32px; border-bottom: 1px solid var(--border); display: flex;
+  align-items: center; padding: 0 12px; gap: 8px; background: var(--bg2); font-size: 10px;
+}
+.mn-topbar-pills { display: flex; gap: 2px; background: var(--surface); border-radius: 4px; padding: 2px; }
+.mn-pill { padding: 3px 8px; border-radius: 3px; font-size: 9px; color: var(--text2); }
+.mn-pill.active { background: var(--accent); color: white; }
+.mn-decisions-btn {
+  margin-left: auto; padding: 3px 8px; border-radius: 4px;
+  background: var(--accent); color: white; font-size: 9px; font-weight: 600;
+}
+.mn-content { flex: 1; overflow: hidden; position: relative; }
+.mn-streaming {
+  width: 30px; height: 2px; border-radius: 1px; margin-left: auto;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+  background-size: 200% 100%; animation: stream 2s linear infinite;
+}
+@keyframes stream { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+/* Mini decisions cards */
+.mn-decisions { padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mn-decision-card {
+  padding: 8px 10px; border-radius: 8px; background: var(--surface);
+  border: 1px solid var(--border); font-size: 9px;
+}
+.mn-dc-type { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 8px; font-weight: 600; margin-bottom: 4px; }
+.mn-dc-q { font-size: 10px; font-weight: 500; margin-bottom: 6px; line-height: 1.3; }
+.mn-dc-actions { display: flex; gap: 4px; }
+.mn-dc-btn { flex: 1; padding: 4px; border-radius: 4px; font-size: 8px; text-align: center; font-weight: 600; }
+
+/* Mini tree */
+.mn-tree { padding: 10px 12px; }
+.mn-obj { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 10px; }
+.mn-obj.root { font-size: 12px; font-weight: 700; padding: 6px 0; }
+.mn-obj-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.mn-obj-bar { width: 40px; height: 2px; background: var(--surface3); border-radius: 1px; margin-left: auto; }
+.mn-obj-fill { height: 100%; border-radius: 1px; }
+.mn-tree-indent { padding-left: 16px; border-left: 1px solid var(--border); margin-left: 2px; }
+.mn-decision-tag { font-size: 8px; padding: 1px 4px; border-radius: 3px; margin-left: auto; }
+
+/* ═══════════════════════════════════════════════ */
+/* OTEL-TO-CODE DEMO                               */
+/* ═══════════════════════════════════════════════ */
+.otel-code-demo { display: flex; gap: 16px; max-width: 1100px; width: 100%; }
+.otel-code-panel {
+  flex: 1; border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--border); background: var(--surface);
+}
+.ocp-header {
+  padding: 8px 14px; border-bottom: 1px solid var(--border);
+  font-size: 10px; font-weight: 600; color: var(--text2);
+  display: flex; align-items: center; gap: 8px; background: var(--bg2);
+}
+.ocp-body { padding: 12px; }
+.trace-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 6px; font-size: 10px; border-radius: 4px; transition: background 0.1s;
+}
+.trace-row.active { background: rgba(99,102,241,0.08); }
+.trace-name { width: 140px; font-family: 'JetBrains Mono', monospace; font-size: 9px; white-space: nowrap; overflow: hidden; }
+.trace-bar-bg { flex: 1; height: 10px; background: var(--bg); border-radius: 5px; position: relative; overflow: hidden; }
+.trace-bar-fill { position: absolute; top: 0; height: 100%; border-radius: 5px; }
+.trace-dur { width: 40px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text3); }
+
+.code-line {
+  display: flex; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  line-height: 1.8; padding: 0 6px; border-radius: 3px;
+}
+.code-ln { width: 28px; text-align: right; padding-right: 10px; color: var(--text3); user-select: none; }
+.code-text { flex: 1; white-space: pre; }
+.code-line.hot { background: rgba(99,102,241,0.08); border-left: 2px solid var(--accent); }
+.code-line.hot .code-perf {
+  margin-left: auto; font-size: 9px; color: var(--accent2);
+  padding: 0 6px; background: rgba(99,102,241,0.1); border-radius: 3px;
+}
+.code-obj-tag {
+  margin-left: auto; font-size: 8px; padding: 1px 6px; border-radius: 3px;
+  background: rgba(99,102,241,0.1); color: var(--accent2);
+}
+
+/* ═══════════════════════════════════════════════ */
+/* MISSION CONTROL GRID                            */
+/* ═══════════════════════════════════════════════ */
+.mission-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: 1fr 1fr;
+  gap: 12px; width: min(1100px, 95vw); height: min(600px, 70vh);
+}
+.mission-screen {
+  border-radius: 10px; overflow: hidden;
+  border: 1px solid var(--border); background: var(--bg);
+  position: relative; display: flex; flex-direction: column;
+}
+.ms-header {
+  padding: 6px 10px; border-bottom: 1px solid var(--border);
+  font-size: 9px; font-weight: 600; color: var(--text2);
+  background: var(--bg2); display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+}
+.ms-header-dot { width: 5px; height: 5px; border-radius: 50%; }
+.ms-body { flex: 1; overflow: hidden; padding: 8px; position: relative; }
+
+/* ═══════════════════════════════════════════════ */
+/* TIME TRAVEL                                     */
+/* ═══════════════════════════════════════════════ */
+.time-scrubber { width: min(800px, 85vw); margin-top: 40px; }
+.ts-track { height: 4px; background: var(--surface3); border-radius: 2px; position: relative; margin-bottom: 16px; }
+.ts-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--purple), var(--accent)); width: 75%; }
+.ts-handle {
+  position: absolute; top: 50%; left: 75%; transform: translate(-50%, -50%);
+  width: 16px; height: 16px; border-radius: 50%; background: var(--accent);
+  border: 2px solid white; cursor: pointer; box-shadow: 0 0 20px rgba(99,102,241,0.5);
+}
+.ts-marks { display: flex; justify-content: space-between; font-size: 10px; color: var(--text3); font-family: 'JetBrains Mono', monospace; }
+.ts-events { display: flex; gap: 8px; margin-top: 24px; flex-wrap: wrap; justify-content: center; }
+.ts-event {
+  padding: 8px 14px; border-radius: 8px; background: var(--surface);
+  border: 1px solid var(--border); font-size: 11px; transition: all 0.2s;
+}
+.ts-event.active { border-color: var(--accent); background: rgba(99,102,241,0.08); }
+.ts-event-time { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text3); margin-bottom: 2px; }
+
+/* ═══════════════════════════════════════════════ */
+/* NUMBERS                                         */
+/* ═══════════════════════════════════════════════ */
+.numbers-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+  max-width: 800px; margin-top: 48px;
+}
+.number-card { text-align: center; }
+.number-value {
+  font-size: clamp(40px, 6vw, 64px); font-weight: 900;
+  font-family: 'JetBrains Mono', monospace; line-height: 1;
+}
+.number-label { font-size: 13px; color: var(--text2); margin-top: 8px; }
+.number-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+@keyframes pulse { 0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(34,197,94,0.4); } 50% { opacity:0.7; box-shadow: 0 0 0 6px rgba(34,197,94,0); } }
+</style>
+</head>
+<body>
+
+<!-- Navigation dots -->
+<div class="nav-dots" id="nav-dots"></div>
+<div class="scene-counter" id="scene-counter"></div>
+
+<!-- ══════════════════════════════════ -->
+<!-- SCENE 1: TITLE                     -->
+<!-- ══════════════════════════════════ -->
+<div class="scene" id="scene-title">
+  <div class="title-logo fade-up">N</div>
+  <div class="title-main fade-up delay-1">NEXUS</div>
+  <div class="title-sub fade-up delay-2">Engineering Orchestration Platform</div>
+  <div class="scene-subtitle fade-up delay-3">
+    What if one human could orchestrate<br>
+    <span class="highlight">100 objectives</span> across <span class="highlight">10 repos</span>?
+  </div>
+  <div class="title-year">2030</div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- SCENE 2: THE PROBLEM               -->
+<!-- ══════════════════════════════════ -->
+<div class="scene" id="scene-problem">
+  <div class="scene-label fade-up">Today</div>
+  <div class="scene-title fade-up delay-1">
+    Engineering is <span style="color:var(--red)">drowning</span><br>in its own tools
+  </div>
+  <div class="chaos-grid fade-up delay-2">
+    <div class="chaos-item pr">PR #847: Update billing</div>
+    <div class="chaos-item slack">@here deploy blocked</div>
+    <div class="chaos-item jira">BILL-234 migration</div>
+    <div class="chaos-item alert">p99 latency spike</div>
+    <div class="chaos-item slack">merge conflict in pay.js</div>
+    <div class="chaos-item pr">PR #851: Fix webhook</div>
+    <div class="chaos-item jira">AUTH-89 token expiry</div>
+    <div class="chaos-item alert">Sentry: 342 new errors</div>
+    <div class="chaos-item pr">PR #849: Review?</div>
+    <div class="chaos-item slack">who owns billing/**?</div>
+    <div class="chaos-item jira">MOB-412 push notif</div>
+    <div class="chaos-item alert">CI failed: test-pay</div>
+    <div class="chaos-item slack">can someone review?</div>
+    <div class="chaos-item pr">PR #853: Conflicts!</div>
+    <div class="chaos-item jira">INFRA-67 k8s migrate</div>
+    <div class="chaos-item alert">staging down</div>
+  </div>
+  <div class="problem-stats fade-up delay-3">
+    <div class="problem-stat"><div class="problem-stat-value">47</div><div class="problem-stat-label">open PRs</div></div>
+    <div class="problem-stat"><div class="problem-stat-value">23</div><div class="problem-stat-label">Jira tickets</div></div>
+    <div class="problem-stat"><div class="problem-stat-value">8</div><div class="problem-stat-label">Slack threads</div></div>
+    <div class="problem-stat"><div class="problem-stat-value">1</div><div class="problem-stat-label">human</div></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- SCENE 3: ONE COMMAND               -->
+<!-- ══════════════════════════════════ -->
+<div class="scene" id="scene-start">
+  <div class="scene-label fade-up">Tomorrow</div>
+  <div class="scene-title fade-up delay-1">
+    One command.<br><span class="highlight-green">Everything changes.</span>
+  </div>
+  <div class="terminal-window fade-up delay-2">
+    <div class="terminal-bar">
+      <div class="terminal-dot" style="background:#ff5f57"></div>
+      <div class="terminal-dot" style="background:#febc2e"></div>
+      <div class="terminal-dot" style="background:#28c840"></div>
+    </div>
+    <div class="terminal-body">
+      <div><span class="terminal-prompt">❯</span> <span class="terminal-cmd">nexus start</span></div>
+      <div style="margin-top:8px;color:var(--text2)">
+        <div style="color:var(--accent2)">▸ Scanning 10 repositories...</div>
+        <div style="color:var(--green)">▸ 6 sessions active · 108 objectives decomposed</div>
+        <div style="color:var(--yellow)">▸ 12 decisions waiting for you</div>
+        <div style="color:var(--text2)">▸ OTEL connected · 4 services instrumented</div>
+        <div style="color:var(--green);margin-top:8px">✓ NEXUS ready. You are the orchestrator.</div>
+        <div style="margin-top:12px"><span class="terminal-prompt">❯</span> <span class="terminal-cursor"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- SCENE 4: SURGEON (1 screen)        -->
+<!-- ══════════════════════════════════ -->
+<div class="scene" id="scene-surgeon" style="padding:20px">
+  <div class="scene-label fade-up">1 Screen — Surgeon Mode</div>
+  <div class="scene-subtitle fade-up delay-1" style="margin-bottom:20px;margin-top:0">
+    Focused. One thing at a time. <span class="highlight">Decisions are the interface.</span>
+  </div>
+
+  <div class="monitor-frame large fade-up delay-2">
+    <div class="mini-nexus">
+      <div class="mn-rail">
+        <div class="mn-rail-logo">N</div>
+        <div class="mn-rail-btn active">◎</div>
+        <div class="mn-rail-btn">⬡</div>
+        <div class="mn-rail-btn">▸</div>
+        <div class="mn-rail-btn" style="position:relative">◈<span style="position:absolute;top:2px;right:2px;width:10px;height:10px;border-radius:5px;background:var(--yellow);font-size:7px;display:flex;align-items:center;justify-content:center;color:#000;font-weight:700">12</span></div>
+        <div class="mn-rail-btn">◇</div>
+      </div>
+      <div class="mn-sessions">
+        <div class="mn-session-title">Sessions · 6 active</div>
+        <div class="mn-session active">
+          <div class="mn-session-name">Migrate to Stripe v3</div>
+          <div class="mn-session-meta">18/24 done · <span style="color:var(--yellow)">3 decisions</span> · 3 repos</div>
+          <div class="mn-session-bar"><div class="mn-session-fill" style="width:75%;background:linear-gradient(90deg,var(--accent),var(--green))"></div></div>
+        </div>
+        <div class="mn-session">
+          <div class="mn-session-name">Auth System v2</div>
+          <div class="mn-session-meta">14/16 done · <span style="color:var(--yellow)">1 decision</span></div>
+          <div class="mn-session-bar"><div class="mn-session-fill" style="width:88%;background:var(--green)"></div></div>
+        </div>
+        <div class="mn-session">
+          <div class="mn-session-name" style="color:var(--orange)">Mobile App v3</div>
+          <div class="mn-session-meta">9/22 done · <span style="color:var(--red)">1 error</span></div>
+          <div class="mn-session-bar"><div class="mn-session-fill" style="width:41%;background:var(--orange)"></div></div>
+        </div>
+        <div class="mn-session">
+          <div class="mn-session-name">Invoice PDF</div>
+          <div class="mn-session-meta">4/12 done</div>
+          <div class="mn-session-bar"><div class="mn-session-fill" style="width:33%;background:var(--accent)"></div></div>
+        </div>
+        <div class="mn-session">
+          <div class="mn-session-name">K8s → Nomad</div>
+          <div class="mn-session-meta">12/34 done · <span style="color:var(--yellow)">5 decisions</span></div>
+          <div class="mn-session-bar"><div class="mn-session-fill" style="width:35%;background:var(--orange)"></div></div>
+        </div>
+        <div class="mn-session" style="opacity:0.5">
+          <div class="mn-session-name" style="color:var(--yellow)">Pricing Redesign ⏳</div>
+          <div class="mn-session-meta">blocked by Stripe v3</div>
+        </div>
+      </div>
+      <div class="mn-main">
+        <div class="mn-topbar">
+          <div class="mn-topbar-pills">
+            <div class="mn-pill">Galaxy</div>
+            <div class="mn-pill">Tree</div>
+            <div class="mn-pill">Flow</div>
+            <div class="mn-pill active">Decisions</div>
+            <div class="mn-pill">OTEL</div>
+          </div>
+          <div style="margin-left:auto;font-size:9px;color:var(--text2);display:flex;align-items:center;gap:6px">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite"></div>
+            108 objectives · 6 sessions
+          </div>
+          <div class="mn-decisions-btn">12 decisions ⌘I</div>
+        </div>
+        <div class="mn-content">
+          <div class="mn-decisions">
+            <div class="mn-decision-card" style="border-color:rgba(234,179,8,0.3)">
+              <div class="mn-dc-type" style="background:rgba(234,179,8,0.1);color:var(--yellow)">◈ Deploy Gate</div>
+              <div style="font-size:9px;color:var(--text3);margin-bottom:3px">Stripe v3 › Canary</div>
+              <div class="mn-dc-q">Promote canary from 5% → 25%?</div>
+              <div style="display:flex;gap:6px;margin-bottom:4px;font-size:9px">
+                <div style="flex:1;text-align:center"><div style="font-size:12px;font-weight:700;color:var(--green)">31ms</div><div style="font-size:7px;color:var(--text3)">p99</div></div>
+                <div style="flex:1;text-align:center"><div style="font-size:12px;font-weight:700;color:var(--green)">0.01%</div><div style="font-size:7px;color:var(--text3)">errors</div></div>
+                <div style="flex:1;text-align:center"><div style="font-size:12px;font-weight:700;color:var(--green)">99.3%</div><div style="font-size:7px;color:var(--text3)">success</div></div>
+              </div>
+              <div class="mn-dc-actions">
+                <div class="mn-dc-btn" style="background:rgba(34,197,94,0.1);color:var(--green)">Promote</div>
+                <div class="mn-dc-btn" style="background:var(--surface2);color:var(--text2)">Hold</div>
+                <div class="mn-dc-btn" style="background:rgba(239,68,68,0.1);color:var(--red)">Rollback</div>
+              </div>
+              <div style="font-size:7px;color:var(--yellow);margin-top:4px">↳ 3 objectives waiting · blocks Pricing session</div>
+            </div>
+            <div class="mn-decision-card" style="border-color:rgba(168,85,247,0.3)">
+              <div class="mn-dc-type" style="background:rgba(168,85,247,0.1);color:var(--purple)">◈ Architecture</div>
+              <div style="font-size:9px;color:var(--text3);margin-bottom:3px">Stripe v3 › Webhooks</div>
+              <div class="mn-dc-q">Shared middleware or per-handler verification?</div>
+              <div class="mn-dc-actions">
+                <div class="mn-dc-btn" style="background:rgba(168,85,247,0.1);color:var(--purple)">Shared</div>
+                <div class="mn-dc-btn" style="background:var(--surface2);color:var(--text2)">Per-handler</div>
+              </div>
+              <div style="font-size:7px;color:var(--purple);margin-top:4px">↳ 2 sub-objectives blocked</div>
+            </div>
+            <div class="mn-decision-card" style="border-color:rgba(239,68,68,0.3)">
+              <div class="mn-dc-type" style="background:rgba(239,68,68,0.1);color:var(--red)">⚠ Error</div>
+              <div style="font-size:9px;color:var(--text3);margin-bottom:3px">Mobile v3 › Push Notifs</div>
+              <div class="mn-dc-q">SMTP connection refused. Creds expired?</div>
+              <div class="mn-dc-actions">
+                <div class="mn-dc-btn" style="background:var(--surface2);color:var(--text2)">New creds</div>
+                <div class="mn-dc-btn" style="background:var(--surface2);color:var(--text2)">Switch SES</div>
+              </div>
+            </div>
+            <div class="mn-decision-card">
+              <div class="mn-dc-type" style="background:rgba(99,102,241,0.1);color:var(--accent2)">◈ Scope</div>
+              <div style="font-size:9px;color:var(--text3);margin-bottom:3px">Auth v2 › Sessions</div>
+              <div class="mn-dc-q">Token rotation needs 12 more services. Expand?</div>
+              <div class="mn-dc-actions">
+                <div class="mn-dc-btn" style="background:rgba(34,197,94,0.1);color:var(--green)">Expand (+12)</div>
+                <div class="mn-dc-btn" style="background:var(--surface2);color:var(--text2)">Top 5 only</div>
+              </div>
+            </div>
+            <div class="mn-decision-card">
+              <div class="mn-dc-type" style="background:rgba(234,179,8,0.1);color:var(--yellow)">◈ Deploy</div>
+              <div style="font-size:9px;color:var(--text3);margin-bottom:3px">K8s→Nomad › Terraform</div>
+              <div class="mn-dc-q">Apply plan: 14 add, 3 modify, 0 destroy?</div>
+              <div class="mn-dc-actions">
+                <div class="mn-dc-btn" style="background:rgba(34,197,94,0.1);color:var(--green)">Apply</div>
+                <div class="mn-dc-btn" style="background:rgba(239,68,68,0.1);color:var(--red)">Reject</div>
+              </div>
+            </div>
+            <div class="mn-decision-card" style="border-color:rgba(239,68,68,0.2)">
+              <div class="mn-dc-type" style="background:rgba(239,68,68,0.1);color:var(--red)">◈ Conflict</div>
+              <div style="font-size:9px;color:var(--text3);margin-bottom:3px">Nomad vs Auth v2</div>
+              <div class="mn-dc-q">Both want api-gw/config/routes.yml</div>
+              <div class="mn-dc-actions">
+                <div class="mn-dc-btn" style="background:rgba(34,197,94,0.1);color:var(--green)">Shared</div>
+                <div class="mn-dc-btn" style="background:var(--surface2);color:var(--text2)">Queue</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="monitor-stand"></div>
+  <div class="monitor-base"></div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- SCENE 5: PILOT (2 screens)         -->
+<!-- ══════════════════════════════════ -->
+<div class="scene" id="scene-pilot" style="padding:20px">
+  <div class="scene-label fade-up">2 Screens — Pilot Mode</div>
+  <div class="scene-subtitle fade-up delay-1" style="margin-bottom:20px;margin-top:0">
+    Left: command. Right: <span class="highlight-cyan">live web preview with OTEL traces flowing through your code</span>.
+  </div>
+
+  <div style="display:flex;gap:24px;align-items:flex-end" class="fade-up delay-2">
+    <!-- Screen 1: Objective tree -->
+    <div class="monitor-frame medium">
+      <div class="mini-nexus" style="font-size:10px">
+        <div class="mn-rail" style="width:32px;padding:6px 0">
+          <div class="mn-rail-logo" style="width:20px;height:20px;font-size:8px;margin-bottom:6px">N</div>
+          <div class="mn-rail-btn active" style="width:22px;height:22px;font-size:10px">⬡</div>
+          <div class="mn-rail-btn" style="width:22px;height:22px;font-size:10px">▸</div>
+        </div>
+        <div class="mn-main">
+          <div class="mn-topbar" style="height:26px;font-size:9px">
+            <div class="mn-topbar-pills"><div class="mn-pill">Galaxy</div><div class="mn-pill active" style="font-size:8px">Tree</div><div class="mn-pill">Flow</div></div>
+            <div class="mn-decisions-btn" style="font-size:8px;padding:2px 6px">12 decisions</div>
+          </div>
+          <div class="mn-content">
+            <div class="mn-tree">
+              <div class="mn-obj root">
+                <div class="mn-obj-dot" style="background:var(--accent)"></div>
+                <span>Migrate to Stripe v3</span>
+                <div class="mn-obj-bar" style="width:50px"><div class="mn-obj-fill" style="width:75%;background:linear-gradient(90deg,var(--accent),var(--green))"></div></div>
+              </div>
+              <div class="mn-tree-indent">
+                <div class="mn-obj"><div class="mn-obj-dot" style="background:var(--green)"></div> <span style="color:var(--green)">API Endpoints ✓</span></div>
+                <div class="mn-obj" style="color:var(--accent2)"><div class="mn-obj-dot" style="background:var(--accent)"></div> Webhook Handlers <div class="mn-streaming"></div></div>
+                <div class="mn-tree-indent" style="font-size:9px">
+                  <div class="mn-obj"><div class="mn-obj-dot" style="background:var(--green);width:4px;height:4px"></div> <span style="color:var(--green)">payment_intent.succeeded ✓</span></div>
+                  <div class="mn-obj"><div class="mn-obj-dot" style="background:var(--green);width:4px;height:4px"></div> <span style="color:var(--green)">payment_failed ✓</span></div>
+                  <div class="mn-obj"><div class="mn-obj-dot" style="background:var(--accent);width:4px;height:4px"></div> dispute handlers <div class="mn-streaming" style="width:20px"></div></div>
+                  <div class="mn-obj"><div class="mn-obj-dot" style="background:var(--purple);width:4px;height:4px"></div> <span style="color:var(--purple)">sig verification ◈</span></div>
+                </div>
+                <div class="mn-obj"><div class="mn-obj-dot" style="background:var(--accent)"></div> Frontend Checkout <div class="mn-streaming"></div></div>
+                <div class="mn-obj"><div class="mn-obj-dot" style="background:var(--yellow)"></div> Integration Tests <span style="font-size:8px;color:var(--text3);margin-left:auto">3/8</span></div>
+                <div class="mn-obj"><div class="mn-obj-dot" style="background:var(--yellow)"></div> Canary Validation <span class="mn-decision-tag" style="background:rgba(234,179,8,0.1);color:var(--yellow)">◈ promote?</span></div>
+              </div>
+              <div style="height:8px"></div>
+              <div class="mn-obj root" style="font-size:11px"><div class="mn-obj-dot" style="background:var(--green)"></div> Auth System v2 <div class="mn-obj-bar" style="width:50px"><div class="mn-obj-fill" style="width:88%;background:var(--green)"></div></div></div>
+              <div class="mn-obj root" style="font-size:11px"><div class="mn-obj-dot" style="background:var(--orange)"></div> Mobile App v3 <div class="mn-obj-bar" style="width:50px"><div class="mn-obj-fill" style="width:41%;background:var(--orange)"></div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="monitor-label">COCKPIT — Objective Tree</div>
+    </div>
+
+    <!-- Screen 2: Live web + OTEL overlay -->
+    <div class="monitor-frame medium">
+      <div style="width:100%;height:100%;position:relative;background:#fff;overflow:hidden">
+        <div style="height:28px;background:#f8f8f8;border-bottom:1px solid #e5e5e5;display:flex;align-items:center;padding:0 10px;gap:6px">
+          <div style="width:8px;height:8px;border-radius:50%;background:#ff5f57"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:#febc2e"></div>
+          <div style="width:8px;height:8px;border-radius:50%;background:#28c840"></div>
+          <div style="flex:1;height:18px;border-radius:4px;background:#fff;border:1px solid #ddd;padding:0 8px;font-size:9px;color:#666;display:flex;align-items:center">🔒 app.acme.com/checkout</div>
+        </div>
+        <div style="padding:12px;color:#333;font-size:10px">
+          <div style="display:flex;gap:12px;padding-bottom:8px;border-bottom:1px solid #eee;margin-bottom:10px;font-size:9px;color:#666">
+            <span>Dashboard</span> <span>Products</span> <span style="font-weight:600;color:#333">Checkout</span> <span>Settings</span>
+          </div>
+          <div style="padding:16px;border-radius:8px;margin-bottom:10px;text-align:center;background:linear-gradient(135deg,#6366f1,#a855f7);color:white">
+            <div style="font-size:14px;font-weight:700;margin-bottom:4px">Complete Your Purchase</div>
+            <div style="font-size:9px;opacity:0.8">Secure payment powered by Stripe</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">
+            <div style="padding:8px;border-radius:6px;border:1px solid #eee;text-align:center"><div style="font-size:16px;font-weight:700;color:#333">$29</div><div style="font-size:8px;color:#666">Starter</div></div>
+            <div style="padding:8px;border-radius:6px;border:2px solid #6366f1;text-align:center"><div style="font-size:16px;font-weight:700;color:#333">$79</div><div style="font-size:8px;color:#666">Pro</div></div>
+            <div style="padding:8px;border-radius:6px;border:1px solid #eee;text-align:center"><div style="font-size:16px;font-weight:700;color:#333">$199</div><div style="font-size:8px;color:#666">Enterprise</div></div>
+          </div>
+          <div style="padding:8px;border-radius:6px;border:1px solid #eee;margin-bottom:8px"><div style="font-size:9px;color:#999;margin-bottom:2px">Card Number</div><div style="font-size:10px">4242 4242 4242 4242</div></div>
+          <div style="padding:10px;border-radius:6px;background:#6366f1;color:white;text-align:center;font-size:11px;font-weight:600">Pay $79.00</div>
+        </div>
+
+        <!-- OTEL overlay -->
+        <div style="position:absolute;inset:0;background:rgba(6,6,12,0.7);backdrop-filter:blur(2px)">
+          <div style="position:absolute;top:8px;left:8px;font-size:9px;color:var(--accent2);font-weight:600">◈ LIVE OTEL TRACE</div>
+          <div style="position:absolute;top:8px;right:8px;font-size:8px;color:var(--text3);font-family:'JetBrains Mono',monospace">trace: 7f3a2b · 31ms</div>
+
+          <svg style="position:absolute;inset:0;width:100%;height:100%">
+            <line x1="50%" y1="78%" x2="50%" y2="68%" stroke="var(--accent)" stroke-width="1" opacity="0.4"/>
+            <line x1="50%" y1="63%" x2="30%" y2="53%" stroke="var(--accent)" stroke-width="1" opacity="0.4"/>
+            <line x1="50%" y1="63%" x2="70%" y2="53%" stroke="var(--green)" stroke-width="1" opacity="0.4"/>
+            <line x1="30%" y1="48%" x2="30%" y2="38%" stroke="var(--purple)" stroke-width="1" opacity="0.4"/>
+            <line x1="70%" y1="48%" x2="70%" y2="38%" stroke="var(--cyan)" stroke-width="1" opacity="0.4"/>
+          </svg>
+
+          <div style="position:absolute;bottom:17%;left:50%;transform:translateX(-50%);padding:3px 8px;border-radius:4px;font-size:8px;font-family:'JetBrains Mono',monospace;background:rgba(99,102,241,0.15);color:var(--accent2);border:1px solid rgba(99,102,241,0.3)">POST /api/pay → 31ms</div>
+          <div style="position:absolute;bottom:37%;left:22%;padding:3px 8px;border-radius:4px;font-size:8px;font-family:'JetBrains Mono',monospace;background:rgba(168,85,247,0.15);color:var(--purple);border:1px solid rgba(168,85,247,0.3)">stripe.paymentIntents → 23ms</div>
+          <div style="position:absolute;bottom:37%;right:12%;padding:3px 8px;border-radius:4px;font-size:8px;font-family:'JetBrains Mono',monospace;background:rgba(34,197,94,0.15);color:var(--green);border:1px solid rgba(34,197,94,0.3)">db.insert → 4ms</div>
+          <div style="position:absolute;bottom:52%;left:22%;padding:3px 8px;border-radius:4px;font-size:7px;font-family:'JetBrains Mono',monospace;background:rgba(234,179,8,0.15);color:var(--yellow);border:1px solid rgba(234,179,8,0.3)">validate_webhook → 2ms</div>
+          <div style="position:absolute;bottom:52%;right:12%;padding:3px 8px;border-radius:4px;font-size:7px;font-family:'JetBrains Mono',monospace;background:rgba(34,197,94,0.15);color:var(--green);border:1px solid rgba(34,197,94,0.3)">event.publish → 1ms</div>
+
+          <div style="position:absolute;bottom:6px;left:8px;right:8px;padding:6px 8px;border-radius:6px;background:rgba(15,15,26,0.9);border:1px solid var(--border);font-size:8px;display:flex;align-items:center;gap:6px">
+            <span style="color:var(--accent2)">◎ Stripe v3 › API Endpoints</span>
+            <span style="color:var(--text3)">·</span>
+            <span style="color:var(--green)">routes/pay.js:40</span>
+            <span style="color:var(--text3)">·</span>
+            <span style="color:var(--green)">all spans green</span>
+            <span style="margin-left:auto;color:var(--text3)">canary 5%</span>
+          </div>
+        </div>
+      </div>
+      <div class="monitor-label">LIVE PREVIEW — OTEL Trace Overlay</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- SCENE 6: OTEL TO CODE              -->
+<!-- ══════════════════════════════════ -->
+<div class="scene" id="scene-otel-code" style="padding:20px">
+  <div class="scene-label fade-up">The Killer Feature</div>
+  <div class="scene-title fade-up delay-1" style="font-size:clamp(24px,3.5vw,40px)">
+    From <span class="highlight-cyan">production trace</span> to <span class="highlight">code line</span><br>in <span class="highlight-green">2 seconds</span>
+  </div>
+  <div class="scene-subtitle fade-up delay-2" style="margin-bottom:24px">
+    OTEL spans map to exact lines of code. See performance per function, per line, live. Click a trace span → land on the objective that wrote it.
+  </div>
+
+  <div class="otel-code-demo fade-up delay-3">
+    <div class="otel-code-panel" style="flex:0.9">
+      <div class="ocp-header"><div style="width:6px;height:6px;border-radius:50%;background:var(--cyan)"></div> OTEL Trace · POST /api/pay · 31ms</div>
+      <div class="ocp-body">
+        <div class="trace-row active">
+          <div class="trace-name">POST /api/pay</div>
+          <div class="trace-bar-bg"><div class="trace-bar-fill" style="left:0;width:100%;background:var(--green);opacity:0.5"></div></div>
+          <div class="trace-dur">31ms</div>
+        </div>
+        <div class="trace-row" style="padding-left:12px">
+          <div class="trace-name" style="color:var(--text2)">→ validate_request</div>
+          <div class="trace-bar-bg"><div class="trace-bar-fill" style="left:0;width:6%;background:var(--text3);opacity:0.5"></div></div>
+          <div class="trace-dur">2ms</div>
+        </div>
+        <div class="trace-row active" style="padding-left:12px;background:rgba(99,102,241,0.08)">
+          <div class="trace-name" style="color:var(--accent2)">→ stripe.paymentIntents</div>
+          <div class="trace-bar-bg"><div class="trace-bar-fill" style="left:8%;width:74%;background:var(--accent);opacity:0.5"></div></div>
+          <div class="trace-dur" style="color:var(--accent2)">23ms</div>
+        </div>
+        <div class="trace-row" style="padding-left:24px">
+          <div class="trace-name" style="color:var(--text3)">→ http.post stripe</div>
+          <div class="trace-bar-bg"><div class="trace-bar-fill" style="left:10%;width:68%;background:var(--purple);opacity:0.3"></div></div>
+          <div class="trace-dur">21ms</div>
+        </div>
+        <div class="trace-row" style="padding-left:12px">
+          <div class="trace-name" style="color:var(--text2)">→ db.insert</div>
+          <div class="trace-bar-bg"><div class="trace-bar-fill" style="left:84%;width:13%;background:var(--cyan);opacity:0.5"></div></div>
+          <div class="trace-dur">4ms</div>
+        </div>
+        <div class="trace-row" style="padding-left:12px">
+          <div class="trace-name" style="color:var(--text2)">→ event.publish</div>
+          <div class="trace-bar-bg"><div class="trace-bar-fill" style="left:97%;width:3%;background:var(--green);opacity:0.5"></div></div>
+          <div class="trace-dur">1ms</div>
+        </div>
+        <div style="margin-top:12px;padding:8px 10px;border-radius:6px;background:var(--bg2);font-size:9px">
+          <div style="color:var(--text3);margin-bottom:4px">OBJECTIVE ATTRIBUTION</div>
+          <div style="color:var(--accent2)">Stripe v3 › API Endpoint Migration</div>
+          <div style="color:var(--text3);margin-top:2px">Code written: routes/pay.js:36-56 · lib/stripe-client.js:1-62</div>
+        </div>
+      </div>
+    </div>
+    <div class="otel-code-panel" style="flex:1.1">
+      <div class="ocp-header"><div style="width:6px;height:6px;border-radius:50%;background:var(--accent)"></div> routes/pay.js <span style="margin-left:auto;font-size:9px;color:var(--green)">Stripe v3 › API Endpoints ✓</span></div>
+      <div class="ocp-body" style="padding:4px 0">
+        <div class="code-line"><span class="code-ln">36</span><span class="code-text"><span style="color:var(--purple)">router</span>.<span style="color:var(--green)">post</span>(<span style="color:var(--yellow)">"/pay"</span>, <span style="color:var(--purple)">async</span> (req, res) => {</span></div>
+        <div class="code-line"><span class="code-ln">37</span><span class="code-text">  <span style="color:var(--purple)">const</span> { amount, currency } = req.body;</span></div>
+        <div class="code-line hot"><span class="code-ln">38</span><span class="code-text">  <span style="color:var(--purple)">const</span> stripe = <span style="color:var(--green)">new</span> Stripe(config.stripeKey);</span><span class="code-perf">2ms validate</span></div>
+        <div class="code-line"><span class="code-ln">39</span><span class="code-text"></span></div>
+        <div class="code-line hot" style="background:rgba(99,102,241,0.12)"><span class="code-ln">40</span><span class="code-text">  <span style="color:var(--purple)">const</span> intent = <span style="color:var(--purple)">await</span> stripe.paymentIntents.<span style="color:var(--green)">create</span>({</span><span class="code-perf" style="background:rgba(99,102,241,0.2)">23ms ███████</span></div>
+        <div class="code-line hot" style="background:rgba(99,102,241,0.08)"><span class="code-ln">41</span><span class="code-text">    amount,</span><span class="code-obj-tag">Stripe v3 › API Endpoints</span></div>
+        <div class="code-line hot" style="background:rgba(99,102,241,0.08)"><span class="code-ln">42</span><span class="code-text">    currency,</span></div>
+        <div class="code-line hot" style="background:rgba(99,102,241,0.08)"><span class="code-ln">43</span><span class="code-text">    payment_method: req.body.paymentMethod,</span></div>
+        <div class="code-line hot" style="background:rgba(99,102,241,0.08)"><span class="code-ln">44</span><span class="code-text">    confirm: <span style="color:var(--yellow)">true</span>,</span></div>
+        <div class="code-line hot" style="background:rgba(99,102,241,0.08)"><span class="code-ln">45</span><span class="code-text">    automatic_payment_methods: {</span></div>
+        <div class="code-line hot" style="background:rgba(99,102,241,0.08)"><span class="code-ln">46</span><span class="code-text">      enabled: <span style="color:var(--yellow)">true</span>,</span></div>
+        <div class="code-line hot" style="background:rgba(99,102,241,0.08)"><span class="code-ln">47</span><span class="code-text">      allow_redirects: <span style="color:var(--yellow)">"never"</span>,</span></div>
+        <div class="code-line hot" style="background:rgba(99,102,241,0.08)"><span class="code-ln">48</span><span class="code-text">    },</span></div>
+        <div class="code-line"><span class="code-ln">49</span><span class="code-text">  });</span></div>
+        <div class="code-line"><span class="code-ln">50</span><span class="code-text"></span></div>
+        <div class="code-line hot"><span class="code-ln">51</span><span class="code-text">  <span style="color:var(--purple)">await</span> db.<span style="color:var(--green)">insert</span>(<span style="color:var(--yellow)">'payment_records'</span>, {</span><span class="code-perf">4ms █</span></div>
+        <div class="code-line"><span class="code-ln">52</span><span class="code-text">    intent_id: intent.id,</span></div>
+        <div class="code-line"><span class="code-ln">53</span><span class="code-text">    amount, currency, status: intent.status,</span></div>
+        <div class="code-line"><span class="code-ln">54</span><span class="code-text">  });</span></div>
+        <div class="code-line"><span class="code-ln">55</span><span class="code-text"></span></div>
+        <div class="code-line"><span class="code-ln">56</span><span class="code-text">  res.<span style="color:var(--green)">json</span>({ id: intent.id, status: intent.status });</span></div>
+        <div class="code-line"><span class="code-ln">57</span><span class="code-text">});</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- SCENE 7: COMMANDER (3 screens)     -->
+<!-- ══════════════════════════════════ -->
+<div class="scene" id="scene-commander" style="padding:20px">
+  <div class="scene-label fade-up">3 Screens — Commander Mode</div>
+  <div class="scene-subtitle fade-up delay-1" style="margin-bottom:20px;margin-top:0">
+    Nothing hidden. Decisions, dependency graph, and live OTEL traces — <span class="highlight">simultaneously</span>.
+  </div>
+
+  <div style="display:flex;gap:16px;align-items:flex-end" class="fade-up delay-2">
+    <!-- Screen 1: Decisions -->
+    <div class="monitor-frame small">
+      <div style="width:100%;height:100%;background:var(--bg);padding:8px;overflow:hidden">
+        <div style="font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px;padding:4px 0 8px;border-bottom:1px solid var(--border);margin-bottom:6px">Decisions · 12</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="padding:6px 8px;border-radius:6px;background:var(--surface);border:1px solid rgba(234,179,8,0.2);font-size:8px"><div style="color:var(--yellow);font-weight:600">◈ Deploy: Promote canary 5%→25%?</div><div style="color:var(--text3);font-size:7px">Stripe v3 · p99: 31ms</div></div>
+          <div style="padding:6px 8px;border-radius:6px;background:var(--surface);border:1px solid rgba(168,85,247,0.2);font-size:8px"><div style="color:var(--purple);font-weight:600">◈ Arch: Shared vs per-handler</div><div style="color:var(--text3);font-size:7px">2 objectives blocked</div></div>
+          <div style="padding:6px 8px;border-radius:6px;background:var(--surface);border:1px solid rgba(239,68,68,0.2);font-size:8px"><div style="color:var(--red);font-weight:600">⚠ SMTP connection refused</div><div style="color:var(--text3);font-size:7px">Mobile v3 · 3 blocked</div></div>
+          <div style="padding:6px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-size:8px"><div style="color:var(--accent2);font-weight:600">◈ Scope: Expand auth +12</div></div>
+          <div style="padding:6px 8px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-size:8px;opacity:0.6"><div style="color:var(--yellow);font-weight:600">◈ Terraform plan apply</div></div>
+          <div style="font-size:7px;color:var(--text3);text-align:center;padding:2px">+ 7 more</div>
+        </div>
+      </div>
+      <div class="monitor-label">DECISIONS</div>
+    </div>
+    <!-- Screen 2: Galaxy -->
+    <div class="monitor-frame small" style="height:min(300px,34vh)">
+      <div style="width:100%;height:100%;background:var(--bg);position:relative;overflow:hidden">
+        <div style="position:absolute;top:6px;left:8px;font-size:9px;font-weight:600;color:var(--text3);z-index:1">GALAXY · 108 objectives</div>
+        <svg width="100%" height="100%" id="mini-galaxy"></svg>
+        <div style="position:absolute;bottom:6px;left:8px;right:8px;display:flex;justify-content:space-between;font-size:7px;color:var(--text3)">
+          <span><span style="color:var(--green)">●</span> 41 done</span>
+          <span><span style="color:var(--accent2)">●</span> 47 active</span>
+          <span><span style="color:var(--yellow)">●</span> 12 decisions</span>
+          <span><span style="color:var(--red)">●</span> 8 blocked</span>
+        </div>
+      </div>
+      <div class="monitor-label">GALAXY — Dependency Graph</div>
+    </div>
+    <!-- Screen 3: OTEL + Code -->
+    <div class="monitor-frame small">
+      <div style="width:100%;height:100%;background:var(--bg);display:flex;flex-direction:column;overflow:hidden">
+        <div style="flex:1;padding:6px;border-bottom:1px solid var(--border)">
+          <div style="font-size:8px;font-weight:600;color:var(--text3);margin-bottom:4px">OTEL · API Gateway Latency</div>
+          <svg width="100%" height="50" viewBox="0 0 300 50" preserveAspectRatio="none">
+            <path d="M0,30 C30,29 60,31 90,30 C120,28 150,25 180,22 C210,20 240,23 270,22 L300,21" stroke="var(--green)" stroke-width="1.5" fill="none"/>
+            <path d="M0,25 C30,24 60,26 90,25 C120,22 150,18 180,14 C210,16 240,19 270,18 L300,17" stroke="var(--yellow)" stroke-width="1" fill="none"/>
+            <line x1="195" y1="0" x2="195" y2="50" stroke="var(--yellow)" stroke-width="0.5" opacity="0.5"/>
+          </svg>
+          <div style="display:flex;justify-content:space-between;font-size:7px;color:var(--text3)">
+            <span><span style="color:var(--green)">●</span> p99: 31ms</span>
+            <span><span style="color:var(--yellow)">▼</span> canary</span>
+            <span>0.01% errors</span>
+          </div>
+        </div>
+        <div style="flex:1;padding:6px;overflow:hidden">
+          <div style="font-size:8px;font-weight:600;color:var(--text3);margin-bottom:4px">LIVE TRACE · routes/pay.js</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:8px;line-height:1.6">
+            <div style="display:flex;gap:4px"><span style="color:var(--text3)">40</span><span style="color:var(--text2)">const intent = await stripe.paymentIntents.create({</span><span style="color:var(--accent2);margin-left:auto;white-space:nowrap">23ms</span></div>
+            <div style="display:flex;gap:4px"><span style="color:var(--text3)">51</span><span style="color:var(--text2)">await db.insert('payment_records', {</span><span style="color:var(--green);margin-left:auto;white-space:nowrap">4ms</span></div>
+            <div style="display:flex;gap:4px"><span style="color:var(--text3)">56</span><span style="color:var(--text2)">res.json({ id: intent.id ... });</span><span style="color:var(--green);margin-left:auto;white-space:nowrap">&lt;1ms</span></div>
+          </div>
+          <div style="margin-top:4px;font-size:7px;color:var(--accent2)">◎ Stripe v3 › API Endpoints</div>
+        </div>
+      </div>
+      <div class="monitor-label">OTEL + CODE TRACE</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- SCENE 8: MISSION CONTROL           -->
+<!-- ══════════════════════════════════ -->
+<div class="scene" id="scene-mission" style="padding:20px">
+  <div class="scene-label fade-up">6 Screens — Mission Control</div>
+  <div class="scene-subtitle fade-up delay-1" style="margin-bottom:16px;margin-top:0">
+    You don't <em>use</em> NEXUS. You <span class="highlight">exist in it</span>. Zero tabs. Zero modals. Total ambient awareness.
+  </div>
+
+  <div class="mission-grid fade-up delay-2">
+    <div class="mission-screen"><div class="ms-header"><div class="ms-header-dot" style="background:var(--yellow)"></div> DECISIONS · 12</div><div class="ms-body" style="display:flex;flex-direction:column;gap:3px;font-size:7px;overflow:hidden">
+      <div style="padding:4px 6px;border-radius:4px;background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.15)"><span style="color:var(--yellow);font-weight:600">◈ Promote canary?</span> <span style="color:var(--text3)">Stripe v3</span></div>
+      <div style="padding:4px 6px;border-radius:4px;background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.15)"><span style="color:var(--purple);font-weight:600">◈ Shared vs per-handler</span></div>
+      <div style="padding:4px 6px;border-radius:4px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15)"><span style="color:var(--red);font-weight:600">⚠ SMTP refused</span></div>
+      <div style="padding:4px 6px;border-radius:4px;background:var(--surface);border:1px solid var(--border)"><span style="color:var(--accent2);font-weight:600">◈ Expand auth</span></div>
+      <div style="padding:4px 6px;border-radius:4px;background:var(--surface);border:1px solid var(--border);opacity:0.6"><span style="color:var(--yellow);font-weight:600">◈ Terraform</span></div>
+      <div style="padding:4px 6px;border-radius:4px;background:var(--surface);border:1px solid var(--border);opacity:0.4"><span style="color:var(--green);font-weight:600">◈ Auth canary 100%?</span></div>
+    </div></div>
+
+    <div class="mission-screen"><div class="ms-header"><div class="ms-header-dot" style="background:var(--accent)"></div> GALAXY · 108 objectives</div><div class="ms-body"><svg width="100%" height="100%" id="mission-galaxy"></svg></div></div>
+
+    <div class="mission-screen"><div class="ms-header"><div class="ms-header-dot" style="background:var(--green)"></div> TREE · Stripe v3</div><div class="ms-body" style="font-size:7px;overflow:hidden">
+      <div style="font-weight:700;font-size:9px;margin-bottom:4px">Migrate to Stripe v3 <span style="color:var(--text3);font-weight:400">18/24</span></div>
+      <div style="padding-left:6px;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:2px">
+        <div><span style="color:var(--green)">●</span> API Endpoints ✓</div>
+        <div><span style="color:var(--accent)">●</span> Webhooks <span style="color:var(--accent2);font-size:6px">▸▸</span></div>
+        <div style="padding-left:6px;border-left:1px solid var(--border);font-size:6px;color:var(--text2)">
+          <div><span style="color:var(--green)">●</span> succeeded ✓</div><div><span style="color:var(--green)">●</span> failed ✓</div>
+          <div><span style="color:var(--accent)">●</span> disputes <span style="font-size:5px;color:var(--accent2)">▸▸</span></div>
+          <div><span style="color:var(--purple)">●</span> <span style="color:var(--purple)">sig verify ◈</span></div>
+        </div>
+        <div><span style="color:var(--accent)">●</span> Frontend <span style="color:var(--accent2);font-size:6px">▸▸</span></div>
+        <div><span style="color:var(--yellow)">●</span> Tests 3/8</div>
+        <div><span style="color:var(--yellow)">●</span> <span style="color:var(--yellow)">Canary ◈</span></div>
+      </div>
+    </div></div>
+
+    <div class="mission-screen"><div class="ms-header"><div class="ms-header-dot" style="background:var(--cyan)"></div> LIVE · app.acme.com</div><div class="ms-body" style="padding:0;background:#fff;position:relative;overflow:hidden">
+      <div style="padding:6px;font-size:7px;color:#333">
+        <div style="padding:8px;border-radius:4px;background:linear-gradient(135deg,#6366f1,#a855f7);color:white;text-align:center;margin-bottom:4px"><div style="font-weight:700;font-size:8px">Complete Purchase</div></div>
+        <div style="display:flex;gap:3px;margin-bottom:4px">
+          <div style="flex:1;padding:3px;border:1px solid #eee;border-radius:3px;text-align:center"><div style="font-weight:700;font-size:8px">$29</div></div>
+          <div style="flex:1;padding:3px;border:2px solid #6366f1;border-radius:3px;text-align:center"><div style="font-weight:700;font-size:8px">$79</div></div>
+          <div style="flex:1;padding:3px;border:1px solid #eee;border-radius:3px;text-align:center"><div style="font-weight:700;font-size:8px">$199</div></div>
+        </div>
+        <div style="padding:4px;border-radius:3px;background:#6366f1;color:white;text-align:center;font-size:7px;font-weight:600">Pay $79</div>
+      </div>
+      <div style="position:absolute;inset:0;background:rgba(6,6,12,0.5);display:flex;align-items:center;justify-content:center;flex-direction:column">
+        <div style="font-size:7px;color:var(--accent2);font-weight:600">◈ OTEL OVERLAY</div>
+        <div style="font-size:6px;color:var(--green)">POST /api/pay → 31ms</div>
+      </div>
+    </div></div>
+
+    <div class="mission-screen"><div class="ms-header"><div class="ms-header-dot" style="background:var(--green)"></div> OTEL · Services</div><div class="ms-body" style="display:flex;flex-direction:column;gap:4px;overflow:hidden">
+      <div><div style="font-size:6px;color:var(--text3)">API Gateway Latency</div><svg width="100%" height="28" viewBox="0 0 200 28" preserveAspectRatio="none"><path d="M0,18 C30,17 60,19 90,18 C120,16 150,12 180,10 L200,9" stroke="var(--green)" stroke-width="1" fill="none"/></svg></div>
+      <div><div style="font-size:6px;color:var(--text3)">Error Rate</div><svg width="100%" height="28" viewBox="0 0 200 28" preserveAspectRatio="none"><path d="M0,24 C50,24 100,24 150,24 C160,22 170,23 200,24" stroke="var(--green)" stroke-width="1" fill="none"/></svg></div>
+      <div><div style="font-size:6px;color:var(--text3)">Throughput</div><svg width="100%" height="28" viewBox="0 0 200 28" preserveAspectRatio="none"><path d="M0,22 C30,20 60,18 90,16 C120,14 150,10 180,8 L200,6" stroke="var(--accent)" stroke-width="1" fill="none"/></svg><div style="font-size:6px;color:var(--accent2);text-align:right">3.2/hr ↑</div></div>
+    </div></div>
+
+    <div class="mission-screen"><div class="ms-header"><div class="ms-header-dot" style="background:var(--purple)"></div> TIMELINE</div><div class="ms-body" style="font-size:7px;overflow:hidden;display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;gap:3px"><span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:6px;min-width:20px">14:12</span><span style="width:3px;height:3px;border-radius:50%;background:var(--accent);margin-top:3px;flex-shrink:0"></span><span style="color:var(--text2)">Dispute handler started</span></div>
+      <div style="display:flex;gap:3px"><span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:6px;min-width:20px">14:07</span><span style="width:3px;height:3px;border-radius:50%;background:var(--purple);margin-top:3px;flex-shrink:0"></span><span style="color:var(--purple)">◈ Architecture decision</span></div>
+      <div style="display:flex;gap:3px"><span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:6px;min-width:20px">14:05</span><span style="width:3px;height:3px;border-radius:50%;background:var(--green);margin-top:3px;flex-shrink:0"></span><span style="color:var(--text2)">payment_failed ✓</span></div>
+      <div style="display:flex;gap:3px"><span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:6px;min-width:20px">14:03</span><span style="width:3px;height:3px;border-radius:50%;background:var(--green);margin-top:3px;flex-shrink:0"></span><span style="color:var(--text2)">charges→paymentIntents ✓</span></div>
+      <div style="display:flex;gap:3px"><span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:6px;min-width:20px">14:00</span><span style="width:3px;height:3px;border-radius:50%;background:var(--yellow);margin-top:3px;flex-shrink:0"></span><span style="color:var(--yellow)">Canary at 5%</span></div>
+      <div style="display:flex;gap:3px"><span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:6px;min-width:20px">13:55</span><span style="width:3px;height:3px;border-radius:50%;background:var(--accent);margin-top:3px;flex-shrink:0"></span><span style="color:var(--text2)">billing/** lock granted</span></div>
+      <div style="display:flex;gap:3px"><span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:6px;min-width:20px">13:50</span><span style="width:3px;height:3px;border-radius:50%;background:var(--yellow);margin-top:3px;flex-shrink:0"></span><span style="color:var(--yellow)">Pricing queued</span></div>
+      <div style="display:flex;gap:3px"><span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:6px;min-width:20px">13:30</span><span style="width:3px;height:3px;border-radius:50%;background:var(--accent);margin-top:3px;flex-shrink:0"></span><span style="color:var(--accent2)">Stripe v3 started</span></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- SCENE 9: TIME TRAVEL               -->
+<!-- ══════════════════════════════════ -->
+<div class="scene" id="scene-timetravel" style="background:radial-gradient(ellipse at center,rgba(168,85,247,0.04) 0%,var(--bg) 70%)">
+  <div class="scene-label fade-up">Time Travel</div>
+  <div class="scene-title fade-up delay-1" style="font-size:clamp(24px,3.5vw,40px)">
+    Scrub through <span class="highlight-purple">every moment</span><br>of your system's history
+  </div>
+  <div class="scene-subtitle fade-up delay-2">
+    Every objective. Every decision. Every deploy. See your entire system at any point in time.
+  </div>
+  <div class="time-scrubber fade-up delay-3">
+    <div class="ts-track"><div class="ts-fill"></div><div class="ts-handle"></div></div>
+    <div class="ts-marks"><span>08:00</span><span>09:00</span><span>10:00</span><span>11:00</span><span>12:00</span><span>13:00</span><span>14:00</span><span>now</span></div>
+    <div class="ts-events">
+      <div class="ts-event"><div class="ts-event-time">08:40</div><div style="color:var(--green);font-size:10px">Push notifs deployed</div></div>
+      <div class="ts-event"><div class="ts-event-time">09:15</div><div style="color:var(--green);font-size:10px">Rate limiter upgraded</div></div>
+      <div class="ts-event"><div class="ts-event-time">11:30</div><div style="color:var(--green);font-size:10px">API endpoints migrated</div></div>
+      <div class="ts-event"><div class="ts-event-time">13:30</div><div style="color:var(--accent2);font-size:10px">Stripe v3 started</div></div>
+      <div class="ts-event active"><div class="ts-event-time">14:00</div><div style="color:var(--yellow);font-size:10px">Canary at 5%</div></div>
+      <div class="ts-event active"><div class="ts-event-time">14:12</div><div style="color:var(--yellow);font-size:10px">◈ Promote to 25%?</div></div>
+    </div>
+  </div>
+  <div style="margin-top:32px;text-align:center;font-size:12px;color:var(--text3);max-width:600px" class="fade-up delay-4">
+    Click any moment. See the dependency graph at that instant. See what was blocked. See the decision you made that unlocked 8 objectives. <span class="highlight">Learn from your own orchestration.</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- SCENE 10: THE NUMBERS              -->
+<!-- ══════════════════════════════════ -->
+<div class="scene" id="scene-numbers" style="background:radial-gradient(ellipse at center,rgba(34,197,94,0.04) 0%,var(--bg) 70%)">
+  <div class="scene-label fade-up">One Morning</div>
+  <div class="scene-title fade-up delay-1" style="font-size:clamp(24px,4vw,44px)">
+    What used to take a <span style="color:var(--red);text-decoration:line-through">team of 10</span><br>
+    now takes <span class="highlight-green">one human</span>
+  </div>
+  <div class="numbers-grid fade-up delay-2">
+    <div class="number-card"><div class="number-value" style="color:var(--accent2)">108</div><div class="number-label">objectives completed</div><div class="number-sub">across 6 sessions</div></div>
+    <div class="number-card"><div class="number-value" style="color:var(--green)">10</div><div class="number-label">repositories</div><div class="number-sub">all interconnected</div></div>
+    <div class="number-card"><div class="number-value" style="color:var(--yellow)">47</div><div class="number-label">decisions made</div><div class="number-sub">avg 2.4 min each</div></div>
+    <div class="number-card"><div class="number-value" style="color:var(--green)">4h</div><div class="number-label">total time</div><div class="number-sub">one morning</div></div>
+    <div class="number-card"><div class="number-value" style="color:var(--purple)">0</div><div class="number-label">merge conflicts</div><div class="number-sub">scope locks prevented all</div></div>
+    <div class="number-card"><div class="number-value" style="color:var(--cyan)">0</div><div class="number-label">PRs reviewed</div><div class="number-sub">objectives approved directly</div></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ -->
+<!-- SCENE 11: CLOSING                  -->
+<!-- ══════════════════════════════════ -->
+<div class="scene" id="scene-close" style="background:radial-gradient(ellipse at center,rgba(99,102,241,0.08) 0%,var(--bg) 70%)">
+  <div style="width:100px;height:100px;border-radius:24px;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:white;box-shadow:0 0 100px rgba(99,102,241,0.4);margin-bottom:32px" class="fade-up">N</div>
+  <div class="scene-title fade-up delay-1" style="font-size:clamp(28px,4vw,48px)">
+    This is <span class="highlight">NEXUS</span>
+  </div>
+  <div class="scene-subtitle fade-up delay-2">
+    Engineering orchestration for 2030.<br>
+    Objectives all the way down. Agents are invisible.<br>
+    One human. Infinite scale.
+  </div>
+  <div style="margin-top:40px;display:flex;gap:16px" class="fade-up delay-3">
+    <div style="padding:12px 24px;border-radius:10px;background:var(--accent);color:white;font-size:14px;font-weight:600;cursor:pointer">Get Early Access</div>
+    <div style="padding:12px 24px;border-radius:10px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);font-size:14px;cursor:pointer">Watch Demo</div>
+  </div>
+  <div style="margin-top:48px;font-size:11px;color:var(--text3)" class="fade-up delay-4">Built by engineers who think 10 years ahead.</div>
+</div>
+
+<script>
+const scenes = document.querySelectorAll('.scene');
+const navDotsContainer = document.getElementById('nav-dots');
+const counterEl = document.getElementById('scene-counter');
+
+scenes.forEach((scene, i) => {
+  const dot = document.createElement('div');
+  dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+  dot.onclick = () => scene.scrollIntoView({ behavior: 'smooth' });
+  navDotsContainer.appendChild(dot);
+});
+
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const idx = Array.from(scenes).indexOf(entry.target);
+      document.querySelectorAll('.nav-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+      counterEl.textContent = `${idx + 1} / ${scenes.length}`;
+    }
+  });
+}, { threshold: 0.5 });
+scenes.forEach(scene => observer.observe(scene));
+
+document.addEventListener('keydown', e => {
+  const dots = document.querySelectorAll('.nav-dot');
+  const activeIdx = Array.from(dots).findIndex(d => d.classList.contains('active'));
+  if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); if (activeIdx < scenes.length - 1) scenes[activeIdx + 1].scrollIntoView({ behavior: 'smooth' }); }
+  if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); if (activeIdx > 0) scenes[activeIdx - 1].scrollIntoView({ behavior: 'smooth' }); }
+});
+
+function renderMiniGalaxy(svgId, width, height) {
+  const svg = document.getElementById(svgId);
+  if (!svg) return;
+  const cx = width / 2, cy = height / 2;
+  let html = '';
+  const colors = { active: '#818cf8', complete: '#22c55e', blocked: '#ef4444', decision: '#eab308' };
+  const sessionColors = ['#6366f1', '#a855f7', '#22d3ee', '#eab308', '#f97316'];
+  const counts = [24, 16, 22, 12, 34];
+  counts.forEach((count, si) => {
+    const angle = (si / counts.length) * Math.PI * 2 - Math.PI / 2;
+    const cr = Math.min(width, height) * 0.28;
+    for (let i = 0; i < count; i++) {
+      const r = Math.random();
+      let color = r < 0.38 ? colors.complete : r < 0.82 ? colors.active : r < 0.89 ? colors.blocked : colors.decision;
+      const x = cx + Math.cos(angle) * cr + (Math.random() - 0.5) * cr * 0.7;
+      const y = cy + Math.sin(angle) * cr + (Math.random() - 0.5) * cr * 0.7;
+      const radius = color === colors.decision ? 3 : (color === colors.complete ? 1.5 : 2.5);
+      const opacity = color === colors.complete ? 0.4 : 0.8;
+      if (i > 0 && Math.random() < 0.3) {
+        const pa = angle + (Math.random() - 0.5) * 0.5;
+        const px = cx + Math.cos(pa) * cr + (Math.random() - 0.5) * cr * 0.7;
+        const py = cy + Math.sin(pa) * cr + (Math.random() - 0.5) * cr * 0.7;
+        html += `<line x1="${px}" y1="${py}" x2="${x}" y2="${y}" stroke="${sessionColors[si]}" stroke-width="0.3" opacity="0.2"/>`;
+      }
+      html += `<circle cx="${x}" cy="${y}" r="${radius}" fill="${color}" opacity="${opacity}" stroke="${sessionColors[si]}" stroke-width="0.5"/>`;
+      if (color === colors.decision) {
+        html += `<circle cx="${x}" cy="${y}" r="${radius+3}" fill="none" stroke="${color}" stroke-width="0.3" opacity="0.3"><animate attributeName="r" values="${radius+1};${radius+5};${radius+1}" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.3;0;0.3" dur="2s" repeatCount="indefinite"/></circle>`;
+      }
+    }
+  });
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.innerHTML = html;
+}
+
+window.addEventListener('load', () => {
+  renderMiniGalaxy('mini-galaxy', 360, 260);
+  renderMiniGalaxy('mission-galaxy', 300, 200);
+});
+</script>
+</body>
+</html>

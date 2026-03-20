@@ -1,0 +1,1857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS — Objectives All The Way Down</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #06060c;
+  --bg2: #0a0a14;
+  --surface: #0f0f1a;
+  --surface2: #151525;
+  --surface3: #1a1a2e;
+  --border: #1e1e35;
+  --border2: #2a2a45;
+  --text: #e4e4f0;
+  --text2: #7878a0;
+  --text3: #4a4a6a;
+  --accent: #6366f1;
+  --accent2: #818cf8;
+  --accent3: #a5b4fc;
+  --green: #22c55e;
+  --green2: #4ade80;
+  --red: #ef4444;
+  --red2: #f87171;
+  --yellow: #eab308;
+  --yellow2: #facc15;
+  --orange: #f97316;
+  --cyan: #22d3ee;
+  --pink: #ec4899;
+  --purple: #a855f7;
+}
+html, body { height: 100%; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+}
+
+/* ═══════════════════════════════════════════ */
+/* LAYOUT                                      */
+/* ═══════════════════════════════════════════ */
+.app { display: flex; height: 100vh; }
+
+/* Left rail — thin, iconic */
+.rail {
+  width: 56px; background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 16px 0; gap: 4px; flex-shrink: 0;
+}
+.rail-logo {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 14px; color: white;
+  margin-bottom: 16px;
+}
+.rail-btn {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; cursor: pointer; color: var(--text3);
+  transition: all 0.15s; position: relative;
+}
+.rail-btn:hover { background: var(--surface2); color: var(--text2); }
+.rail-btn.active { background: rgba(99,102,241,0.15); color: var(--accent2); }
+.rail-badge {
+  position: absolute; top: 4px; right: 4px; width: 16px; height: 16px;
+  border-radius: 8px; font-size: 9px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.rail-badge.red { background: var(--red); color: white; }
+.rail-badge.yellow { background: var(--yellow); color: #000; }
+.rail-spacer { flex: 1; }
+
+/* Session panel */
+.session-panel {
+  width: 280px; background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; flex-shrink: 0;
+  overflow: hidden;
+}
+.session-panel.collapsed { width: 0; border: none; }
+.sp-header {
+  padding: 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.sp-title { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 1.5px; }
+.sp-count { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: var(--surface2); color: var(--text2); }
+.sp-body { flex: 1; overflow-y: auto; padding: 8px; }
+
+/* Session cards (root objectives) */
+.session-card {
+  padding: 10px 12px; border-radius: 10px; margin-bottom: 4px;
+  cursor: pointer; transition: all 0.15s; border: 1px solid transparent;
+}
+.session-card:hover { background: var(--surface); }
+.session-card.active { background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.2); }
+.session-card.has-decision { border-left: 3px solid var(--yellow); }
+.session-card.has-error { border-left: 3px solid var(--red); }
+.sc-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+.sc-name { font-size: 13px; font-weight: 600; line-height: 1.3; }
+.sc-repo { font-size: 10px; color: var(--text3); margin-bottom: 6px; }
+.sc-stats { display: flex; gap: 8px; font-size: 10px; color: var(--text2); }
+.sc-stat { display: flex; align-items: center; gap: 3px; }
+.sc-dot { width: 6px; height: 6px; border-radius: 50%; }
+.sc-progress {
+  height: 3px; background: var(--surface3); border-radius: 2px;
+  margin-top: 6px; overflow: hidden;
+}
+.sc-progress-fill { height: 100%; border-radius: 2px; }
+.sc-mini-tree { margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.03); }
+.sc-sub {
+  display: flex; align-items: center; gap: 6px;
+  padding: 2px 0; font-size: 11px; color: var(--text2);
+}
+.sc-sub-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+
+/* Main content area */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Topbar */
+.topbar {
+  height: 48px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px; gap: 12px;
+  background: var(--bg2); flex-shrink: 0;
+}
+.topbar-view-pills { display: flex; gap: 2px; background: var(--surface); border-radius: 8px; padding: 2px; }
+.tvp {
+  padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 500;
+  cursor: pointer; color: var(--text2); transition: all 0.15s;
+}
+.tvp:hover { color: var(--text); }
+.tvp.active { background: var(--accent); color: white; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.topbar-pulse {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text2);
+}
+.pulse-ring {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(34,197,94,0.4); } 50% { opacity:0.7; box-shadow: 0 0 0 6px rgba(34,197,94,0); } }
+.topbar-decisions {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 8px;
+  background: var(--accent); color: white;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  border: none; transition: all 0.15s;
+}
+.topbar-decisions:hover { background: var(--accent2); }
+.kbd { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.15); font-family: 'JetBrains Mono', monospace; }
+
+/* ═══════════════════════════════════════════ */
+/* VIEW: GALAXY (dependency graph)             */
+/* ═══════════════════════════════════════════ */
+.view { display: none; flex: 1; overflow: hidden; position: relative; }
+.view.active { display: flex; }
+
+.galaxy-view { flex-direction: column; }
+.galaxy-canvas {
+  flex: 1; position: relative; overflow: hidden;
+  background: radial-gradient(ellipse at center, rgba(99,102,241,0.03) 0%, var(--bg) 70%);
+}
+.galaxy-svg { width: 100%; height: 100%; }
+
+/* Graph nodes */
+.g-node { cursor: pointer; transition: opacity 0.2s; }
+.g-node:hover { opacity: 1 !important; }
+.g-node circle { transition: all 0.3s; }
+.g-node text { font-family: 'Inter', sans-serif; fill: var(--text2); }
+.g-node .node-label { font-size: 9px; font-weight: 500; }
+.g-node .node-repo { font-size: 7px; fill: var(--text3); }
+.g-edge { stroke: var(--border2); stroke-width: 1; fill: none; opacity: 0.4; }
+.g-edge.critical { stroke: var(--yellow); opacity: 0.7; stroke-dasharray: 4 2; }
+.g-edge.blocked { stroke: var(--red); opacity: 0.7; }
+
+/* Galaxy legend / overlays */
+.galaxy-hud {
+  position: absolute; bottom: 20px; left: 20px; right: 20px;
+  display: flex; gap: 12px; pointer-events: none;
+}
+.hud-card {
+  background: rgba(15,15,26,0.9); backdrop-filter: blur(20px);
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px; pointer-events: auto;
+}
+.hud-title { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.hud-stats { display: flex; gap: 16px; }
+.hud-stat-value { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.hud-stat-label { font-size: 10px; color: var(--text3); margin-top: 1px; }
+.hud-legend { display: flex; gap: 12px; flex-wrap: wrap; }
+.hud-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); }
+.hud-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* Galaxy zoom controls */
+.galaxy-zoom {
+  position: absolute; top: 16px; right: 16px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.gz-btn {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: rgba(15,15,26,0.9); border: 1px solid var(--border);
+  color: var(--text2); font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; backdrop-filter: blur(10px);
+}
+.gz-btn:hover { color: var(--text); border-color: var(--border2); }
+
+/* Galaxy filter bar */
+.galaxy-filters {
+  position: absolute; top: 16px; left: 16px;
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.gf-chip {
+  padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 500;
+  background: rgba(15,15,26,0.9); border: 1px solid var(--border);
+  color: var(--text2); cursor: pointer; backdrop-filter: blur(10px);
+  transition: all 0.15s;
+}
+.gf-chip:hover { border-color: var(--border2); color: var(--text); }
+.gf-chip.active { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.3); color: var(--accent2); }
+.gf-chip .chip-count { font-size: 9px; margin-left: 4px; opacity: 0.6; }
+
+/* ═══════════════════════════════════════════ */
+/* VIEW: TREE (recursive objectives)           */
+/* ═══════════════════════════════════════════ */
+.tree-view { flex-direction: row; }
+.tree-main { flex: 1; overflow-y: auto; padding: 20px; }
+.tree-detail { width: 400px; border-left: 1px solid var(--border); overflow-y: auto; display: flex; flex-direction: column; }
+
+/* Objective tree nodes */
+.obj-tree { padding-left: 0; }
+.obj-tree .obj-tree { padding-left: 24px; position: relative; }
+.obj-tree .obj-tree::before {
+  content: ''; position: absolute; left: 11px; top: 0; bottom: 12px;
+  width: 1px; background: var(--border);
+}
+.obj-node {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 12px; margin-bottom: 2px; border-radius: 10px;
+  cursor: pointer; transition: all 0.15s; position: relative;
+}
+.obj-node:hover { background: var(--surface); }
+.obj-node.selected { background: rgba(99,102,241,0.08); }
+.obj-node.depth-0 { padding: 12px 16px; }
+.obj-node.depth-0 .on-name { font-size: 15px; font-weight: 700; }
+.on-expand {
+  width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: var(--text3); cursor: pointer;
+  margin-top: 2px; transition: all 0.15s;
+}
+.on-expand:hover { background: var(--surface2); color: var(--text2); }
+.on-status {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
+}
+.on-body { flex: 1; min-width: 0; }
+.on-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.on-meta { font-size: 11px; color: var(--text2); display: flex; gap: 8px; flex-wrap: wrap; }
+.on-meta-item { display: flex; align-items: center; gap: 3px; }
+.on-progress {
+  height: 3px; background: var(--surface3); border-radius: 2px;
+  margin-top: 6px; overflow: hidden; max-width: 200px;
+}
+.on-progress-fill { height: 100%; border-radius: 2px; }
+.on-decision-flag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 5px; font-size: 10px; font-weight: 600;
+  margin-top: 4px;
+}
+.on-decision-flag.deploy { background: rgba(234,179,8,0.1); color: var(--yellow); }
+.on-decision-flag.architecture { background: rgba(168,85,247,0.1); color: var(--purple); }
+.on-decision-flag.conflict { background: rgba(239,68,68,0.1); color: var(--red); }
+.on-decision-flag.scope { background: rgba(99,102,241,0.1); color: var(--accent2); }
+.on-streaming {
+  height: 2px; border-radius: 1px; margin-top: 6px; max-width: 120px;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+  background-size: 200% 100%;
+  animation: stream 2s linear infinite;
+}
+@keyframes stream { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+/* Detail panel */
+.detail-header { padding: 20px; border-bottom: 1px solid var(--border); }
+.detail-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+.detail-path { font-size: 11px; color: var(--text3); margin-bottom: 10px; }
+.detail-status-bar {
+  display: flex; gap: 10px; font-size: 11px;
+}
+.dsb-item { display: flex; align-items: center; gap: 4px; color: var(--text2); }
+.detail-body { flex: 1; overflow-y: auto; padding: 16px; }
+.detail-section { margin-bottom: 20px; }
+.detail-section-title {
+  font-size: 10px; font-weight: 600; color: var(--text3);
+  text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px;
+}
+
+/* Execution detail (the "peek behind" for agents) */
+.exec-card {
+  padding: 10px 12px; border-radius: 8px; background: var(--surface);
+  border: 1px solid var(--border); margin-bottom: 6px;
+}
+.exec-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.exec-type { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+.exec-type.agent { background: rgba(99,102,241,0.1); color: var(--accent2); }
+.exec-type.pipeline { background: rgba(34,197,94,0.1); color: var(--green); }
+.exec-type.human { background: rgba(168,85,247,0.1); color: var(--purple); }
+.exec-type.tool { background: rgba(234,179,8,0.1); color: var(--yellow); }
+.exec-status { font-size: 10px; color: var(--text2); }
+.exec-detail { font-size: 11px; color: var(--text2); }
+
+/* Scope locks in detail */
+.lock-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 6px; font-size: 11px;
+  font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; margin-right: 4px;
+}
+.lock-chip.exclusive { background: rgba(239,68,68,0.08); color: var(--red); border: 1px solid rgba(239,68,68,0.15); }
+.lock-chip.shared { background: rgba(99,102,241,0.08); color: var(--accent2); border: 1px solid rgba(99,102,241,0.15); }
+
+/* Artifacts in detail */
+.artifact-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 6px; font-size: 12px;
+  transition: background 0.1s; cursor: pointer;
+}
+.artifact-row:hover { background: var(--surface); }
+.artifact-file { font-family: 'JetBrains Mono', monospace; flex: 1; }
+.artifact-diff { font-size: 10px; color: var(--text3); }
+
+/* ═══════════════════════════════════════════ */
+/* VIEW: FLOW (cross-repo dependency flow)     */
+/* ═══════════════════════════════════════════ */
+.flow-view { flex-direction: column; }
+.flow-canvas { flex: 1; position: relative; overflow: hidden; }
+.flow-columns {
+  display: flex; height: 100%; overflow-x: auto; padding: 20px;
+  gap: 0;
+}
+.flow-column {
+  min-width: 220px; max-width: 260px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  border-right: 1px solid rgba(30,30,53,0.5);
+  padding: 0 12px;
+}
+.flow-col-header {
+  padding: 8px 4px 12px; font-size: 11px; font-weight: 600;
+  color: var(--text3); text-transform: uppercase; letter-spacing: 1px;
+  border-bottom: 1px solid var(--border); margin-bottom: 8px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.flow-col-count { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--surface2); }
+.flow-node {
+  padding: 10px 12px; border-radius: 10px; margin-bottom: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  cursor: pointer; transition: all 0.15s; position: relative;
+}
+.flow-node:hover { border-color: var(--border2); transform: translateY(-1px); }
+.flow-node.decision { border-color: rgba(234,179,8,0.3); }
+.flow-node.blocked { border-color: rgba(239,68,68,0.3); opacity: 0.7; }
+.flow-node.complete { opacity: 0.5; }
+.fn-name { font-size: 12px; font-weight: 600; margin-bottom: 3px; }
+.fn-repo { font-size: 10px; color: var(--text3); margin-bottom: 6px; }
+.fn-bar { height: 3px; background: var(--bg); border-radius: 2px; overflow: hidden; }
+.fn-fill { height: 100%; border-radius: 2px; }
+.fn-deps {
+  margin-top: 6px; font-size: 10px; color: var(--text3);
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+.fn-dep-tag {
+  padding: 1px 6px; border-radius: 4px;
+  background: var(--bg2); font-family: 'JetBrains Mono', monospace;
+}
+.fn-dep-tag.waiting { color: var(--yellow); background: rgba(234,179,8,0.08); }
+.fn-dep-tag.met { color: var(--green); }
+.fn-streaming {
+  height: 2px; border-radius: 1px; margin-top: 6px;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+  background-size: 200% 100%;
+  animation: stream 2s linear infinite;
+}
+
+/* ═══════════════════════════════════════════ */
+/* VIEW: DECISIONS (what needs the human)      */
+/* ═══════════════════════════════════════════ */
+.decisions-view { flex-direction: column; overflow-y: auto; }
+.decisions-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; padding: 20px; }
+
+.decision-card {
+  border-radius: 14px; padding: 20px;
+  background: var(--surface); border: 1px solid var(--border);
+  transition: all 0.2s; cursor: pointer;
+}
+.decision-card:hover { border-color: var(--border2); transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
+.dc-type {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+  margin-bottom: 10px;
+}
+.dc-type.deploy { background: rgba(234,179,8,0.1); color: var(--yellow); }
+.dc-type.architecture { background: rgba(168,85,247,0.1); color: var(--purple); }
+.dc-type.conflict { background: rgba(239,68,68,0.1); color: var(--red); }
+.dc-type.scope { background: rgba(99,102,241,0.1); color: var(--accent2); }
+.dc-type.approval { background: rgba(34,197,94,0.1); color: var(--green); }
+.dc-source { font-size: 11px; color: var(--text2); margin-bottom: 6px; }
+.dc-question { font-size: 15px; font-weight: 500; line-height: 1.4; margin-bottom: 12px; }
+.dc-context {
+  padding: 10px 12px; border-radius: 8px; background: var(--bg2);
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--text2); line-height: 1.5; margin-bottom: 14px;
+}
+.dc-evidence { display: flex; gap: 8px; margin-bottom: 14px; }
+.dc-ev {
+  flex: 1; padding: 8px; border-radius: 8px; background: var(--bg2); text-align: center;
+}
+.dc-ev-value { font-size: 16px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.dc-ev-label { font-size: 10px; color: var(--text3); margin-top: 2px; }
+.dc-actions { display: flex; gap: 8px; }
+.dc-btn {
+  flex: 1; padding: 10px; border-radius: 10px; font-size: 13px; font-weight: 600;
+  border: none; cursor: pointer; transition: all 0.15s; text-align: center;
+}
+.dc-btn:hover { transform: translateY(-1px); }
+.dc-btn.approve { background: rgba(34,197,94,0.1); color: var(--green); }
+.dc-btn.reject { background: rgba(239,68,68,0.1); color: var(--red); }
+.dc-btn.option { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+.dc-impact {
+  margin-top: 10px; padding: 8px 10px; border-radius: 6px;
+  background: rgba(234,179,8,0.04); border: 1px solid rgba(234,179,8,0.08);
+  font-size: 10px; color: var(--yellow);
+}
+
+/* ═══════════════════════════════════════════ */
+/* VIEW: OTEL (observability)                  */
+/* ═══════════════════════════════════════════ */
+.otel-view { flex-direction: column; overflow-y: auto; padding: 20px; gap: 16px; }
+.otel-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.otel-card {
+  padding: 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border);
+}
+.oc-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.oc-sub { font-size: 11px; color: var(--text2); margin-bottom: 12px; }
+.oc-chart { width: 100%; height: 100px; background: var(--bg2); border-radius: 8px; position: relative; overflow: hidden; }
+.oc-chart svg { width: 100%; height: 100%; }
+.otel-traces-card {
+  padding: 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border);
+}
+
+/* ═══════════════════════════════════════════ */
+/* SHARED: Section headings, etc               */
+/* ═══════════════════════════════════════════ */
+.section-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.section-title { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 1.5px; }
+.section-line { flex: 1; height: 1px; background: var(--border); }
+
+/* Repo color dots */
+.repo-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.repo-payments { background: var(--accent); }
+.repo-api { background: var(--green); }
+.repo-frontend { background: var(--pink); }
+.repo-infra { background: var(--orange); }
+.repo-mobile { background: var(--cyan); }
+.repo-auth { background: var(--purple); }
+.repo-billing { background: var(--yellow); }
+.repo-events { background: var(--red); }
+.repo-docs { background: var(--text3); }
+.repo-shared { background: var(--accent3); }
+
+/* Tooltip */
+.tooltip {
+  position: fixed; padding: 8px 12px; border-radius: 8px;
+  background: rgba(15,15,26,0.95); border: 1px solid var(--border2);
+  font-size: 11px; color: var(--text); pointer-events: none;
+  z-index: 1000; display: none; max-width: 260px;
+  backdrop-filter: blur(12px);
+}
+
+/* ═══════════════════════════════════════════ */
+/* ANIMATIONS                                  */
+/* ═══════════════════════════════════════════ */
+@keyframes nodeGlow {
+  0%, 100% { filter: drop-shadow(0 0 2px currentColor); }
+  50% { filter: drop-shadow(0 0 8px currentColor); }
+}
+.node-active { animation: nodeGlow 3s ease-in-out infinite; }
+
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ── Rail ── -->
+  <div class="rail">
+    <div class="rail-logo">N</div>
+    <div class="rail-btn active" onclick="showView('galaxy')" title="Galaxy — Dependency Graph">◎</div>
+    <div class="rail-btn" onclick="showView('tree')" title="Tree — Objective Hierarchy">⬡</div>
+    <div class="rail-btn" onclick="showView('flow')" title="Flow — Cross-repo Pipeline">▸</div>
+    <div class="rail-btn" onclick="showView('decisions')" title="Decisions">
+      ◈
+      <span class="rail-badge yellow">12</span>
+    </div>
+    <div class="rail-btn" onclick="showView('otel')" title="Observability">◇</div>
+    <div class="rail-spacer"></div>
+    <div class="rail-btn" title="Settings">⚙</div>
+  </div>
+
+  <!-- ── Session Panel (root objectives) ── -->
+  <div class="session-panel" id="session-panel">
+    <div class="sp-header">
+      <div class="sp-title">Sessions</div>
+      <div class="sp-count">6 active · 108 objectives</div>
+    </div>
+    <div class="sp-body">
+
+      <!-- Session 1: Stripe v3 -->
+      <div class="session-card active has-decision" onclick="selectSession(this)">
+        <div class="sc-top">
+          <div class="sc-name">Migrate to Stripe v3</div>
+          <div class="sc-dot repo-payments" style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px"></div>
+        </div>
+        <div class="sc-repo">payments-service · api-gateway · frontend</div>
+        <div class="sc-stats">
+          <div class="sc-stat"><span style="color:var(--green)">●</span> 18/24 done</div>
+          <div class="sc-stat"><span style="color:var(--yellow)">◈</span> 3 decisions</div>
+          <div class="sc-stat">3 repos</div>
+        </div>
+        <div class="sc-progress"><div class="sc-progress-fill" style="width:75%;background:linear-gradient(90deg,var(--accent),var(--green))"></div></div>
+        <div class="sc-mini-tree">
+          <div class="sc-sub"><div class="sc-sub-dot" style="background:var(--green)"></div> API endpoints ✓</div>
+          <div class="sc-sub"><div class="sc-sub-dot" style="background:var(--accent)"></div> Webhook handlers <span style="color:var(--text3);margin-left:auto;font-size:10px">▸▸</span></div>
+          <div class="sc-sub"><div class="sc-sub-dot" style="background:var(--yellow)"></div> Canary validation <span style="color:var(--yellow);margin-left:auto;font-size:10px">◈</span></div>
+        </div>
+      </div>
+
+      <!-- Session 2: Auth System -->
+      <div class="session-card" onclick="selectSession(this)">
+        <div class="sc-top">
+          <div class="sc-name">Auth System v2</div>
+          <div class="sc-dot repo-auth" style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px"></div>
+        </div>
+        <div class="sc-repo">auth-service · api-gateway · shared-lib</div>
+        <div class="sc-stats">
+          <div class="sc-stat"><span style="color:var(--green)">●</span> 14/16 done</div>
+          <div class="sc-stat"><span style="color:var(--yellow)">◈</span> 1 decision</div>
+          <div class="sc-stat">3 repos</div>
+        </div>
+        <div class="sc-progress"><div class="sc-progress-fill" style="width:88%;background:linear-gradient(90deg,var(--green),var(--green2))"></div></div>
+      </div>
+
+      <!-- Session 3: Mobile v3 -->
+      <div class="session-card has-error" onclick="selectSession(this)">
+        <div class="sc-top">
+          <div class="sc-name">Mobile App v3</div>
+          <div class="sc-dot repo-mobile" style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px"></div>
+        </div>
+        <div class="sc-repo">mobile-app · api-gateway · push-service</div>
+        <div class="sc-stats">
+          <div class="sc-stat"><span style="color:var(--red)">●</span> 1 error</div>
+          <div class="sc-stat"><span style="color:var(--green)">●</span> 9/22 done</div>
+          <div class="sc-stat">3 repos</div>
+        </div>
+        <div class="sc-progress"><div class="sc-progress-fill" style="width:41%;background:linear-gradient(90deg,var(--accent),var(--orange))"></div></div>
+      </div>
+
+      <!-- Session 4: Invoice PDF -->
+      <div class="session-card" onclick="selectSession(this)">
+        <div class="sc-top">
+          <div class="sc-name">Invoice PDF Generation</div>
+          <div class="sc-dot repo-billing" style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px"></div>
+        </div>
+        <div class="sc-repo">billing-service · frontend</div>
+        <div class="sc-stats">
+          <div class="sc-stat"><span style="color:var(--accent)">●</span> 4/12 done</div>
+          <div class="sc-stat">2 repos</div>
+        </div>
+        <div class="sc-progress"><div class="sc-progress-fill" style="width:33%;background:var(--accent)"></div></div>
+      </div>
+
+      <!-- Session 5: Infra Migration -->
+      <div class="session-card has-decision" onclick="selectSession(this)">
+        <div class="sc-top">
+          <div class="sc-name">K8s → Nomad Migration</div>
+          <div class="sc-dot repo-infra" style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px"></div>
+        </div>
+        <div class="sc-repo">infra · terraform · 8 service repos</div>
+        <div class="sc-stats">
+          <div class="sc-stat"><span style="color:var(--yellow)">◈</span> 5 decisions</div>
+          <div class="sc-stat"><span style="color:var(--accent)">●</span> 12/34 done</div>
+          <div class="sc-stat">10 repos</div>
+        </div>
+        <div class="sc-progress"><div class="sc-progress-fill" style="width:35%;background:linear-gradient(90deg,var(--orange),var(--yellow))"></div></div>
+      </div>
+
+      <!-- Session 6: Pricing Redesign -->
+      <div class="session-card" onclick="selectSession(this)">
+        <div class="sc-top">
+          <div class="sc-name">Pricing Page Redesign</div>
+          <div class="sc-dot repo-frontend" style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px"></div>
+        </div>
+        <div class="sc-repo">frontend · billing-service</div>
+        <div class="sc-stats">
+          <div class="sc-stat"><span style="color:var(--yellow)">⏳</span> blocked</div>
+          <div class="sc-stat">0/8 done</div>
+        </div>
+        <div class="sc-progress"><div class="sc-progress-fill" style="width:0%;background:var(--yellow)"></div></div>
+        <div style="margin-top:6px;font-size:10px;color:var(--yellow)">⏳ Waiting for Stripe v3 to release billing/** lock</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Main ── -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-view-pills">
+        <div class="tvp active" onclick="showView('galaxy')">Galaxy</div>
+        <div class="tvp" onclick="showView('tree')">Tree</div>
+        <div class="tvp" onclick="showView('flow')">Flow</div>
+        <div class="tvp" onclick="showView('decisions')">Decisions</div>
+        <div class="tvp" onclick="showView('otel')">OTEL</div>
+      </div>
+      <div class="topbar-right">
+        <div class="topbar-pulse">
+          <div class="pulse-ring"></div>
+          108 objectives · 6 sessions · 10 repos
+        </div>
+        <button class="topbar-decisions" onclick="showView('decisions')">
+          12 decisions <span class="kbd">⌘I</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ -->
+    <!-- GALAXY VIEW                -->
+    <!-- ══════════════════════════ -->
+    <div class="view active" id="view-galaxy">
+      <div class="galaxy-canvas">
+        <svg class="galaxy-svg" id="galaxy-svg"></svg>
+
+        <div class="galaxy-filters">
+          <div class="gf-chip active">All<span class="chip-count">108</span></div>
+          <div class="gf-chip">Active<span class="chip-count">47</span></div>
+          <div class="gf-chip">Blocked<span class="chip-count">8</span></div>
+          <div class="gf-chip">Decisions<span class="chip-count">12</span></div>
+          <div class="gf-chip">Critical Path<span class="chip-count">23</span></div>
+        </div>
+
+        <div class="galaxy-zoom">
+          <div class="gz-btn" onclick="zoomIn()">+</div>
+          <div class="gz-btn" onclick="zoomOut()">−</div>
+          <div class="gz-btn" onclick="zoomFit()">⊡</div>
+        </div>
+
+        <!-- HUD overlay at bottom -->
+        <div class="galaxy-hud">
+          <div class="hud-card" style="flex:1">
+            <div class="hud-title">System Status</div>
+            <div class="hud-stats">
+              <div>
+                <div class="hud-stat-value" style="color:var(--green)">47</div>
+                <div class="hud-stat-label">active</div>
+              </div>
+              <div>
+                <div class="hud-stat-value" style="color:var(--green2)">41</div>
+                <div class="hud-stat-label">complete</div>
+              </div>
+              <div>
+                <div class="hud-stat-value" style="color:var(--yellow)">12</div>
+                <div class="hud-stat-label">decisions</div>
+              </div>
+              <div>
+                <div class="hud-stat-value" style="color:var(--red)">8</div>
+                <div class="hud-stat-label">blocked</div>
+              </div>
+              <div>
+                <div class="hud-stat-value" style="color:var(--text3)">6</div>
+                <div class="hud-stat-label">sessions</div>
+              </div>
+            </div>
+          </div>
+          <div class="hud-card">
+            <div class="hud-title">Repos</div>
+            <div class="hud-legend">
+              <div class="hud-legend-item"><div class="hud-legend-dot repo-payments"></div>payments</div>
+              <div class="hud-legend-item"><div class="hud-legend-dot repo-api"></div>api-gw</div>
+              <div class="hud-legend-item"><div class="hud-legend-dot repo-frontend"></div>frontend</div>
+              <div class="hud-legend-item"><div class="hud-legend-dot repo-infra"></div>infra</div>
+              <div class="hud-legend-item"><div class="hud-legend-dot repo-mobile"></div>mobile</div>
+              <div class="hud-legend-item"><div class="hud-legend-dot repo-auth"></div>auth</div>
+              <div class="hud-legend-item"><div class="hud-legend-dot repo-billing"></div>billing</div>
+              <div class="hud-legend-item"><div class="hud-legend-dot repo-events"></div>events</div>
+              <div class="hud-legend-item"><div class="hud-legend-dot repo-shared"></div>shared</div>
+            </div>
+          </div>
+          <div class="hud-card">
+            <div class="hud-title">Throughput</div>
+            <div class="hud-stats">
+              <div>
+                <div class="hud-stat-value" style="color:var(--accent2)">3.2</div>
+                <div class="hud-stat-label">obj/hour</div>
+              </div>
+              <div>
+                <div class="hud-stat-value" style="color:var(--green)">41</div>
+                <div class="hud-stat-label">done today</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ -->
+    <!-- TREE VIEW                  -->
+    <!-- ══════════════════════════ -->
+    <div class="view" id="view-tree">
+      <div class="tree-main">
+
+        <!-- Root Objective: Stripe v3 -->
+        <div class="obj-tree">
+          <div class="obj-node depth-0 selected">
+            <div class="on-expand">▾</div>
+            <div class="on-status" style="background:var(--accent)"></div>
+            <div class="on-body">
+              <div class="on-name">Migrate to Stripe v3</div>
+              <div class="on-meta">
+                <div class="on-meta-item"><span class="repo-dot repo-payments" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> payments-service</div>
+                <div class="on-meta-item"><span class="repo-dot repo-api" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> api-gateway</div>
+                <div class="on-meta-item"><span class="repo-dot repo-frontend" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> frontend</div>
+                <div class="on-meta-item" style="color:var(--yellow)">◈ 3 decisions</div>
+              </div>
+              <div class="on-progress"><div class="on-progress-fill" style="width:75%;background:linear-gradient(90deg,var(--accent),var(--green))"></div></div>
+            </div>
+          </div>
+
+          <!-- Level 1: API Migration -->
+          <div class="obj-tree">
+            <div class="obj-node">
+              <div class="on-expand">▾</div>
+              <div class="on-status" style="background:var(--green)"></div>
+              <div class="on-body">
+                <div class="on-name" style="color:var(--green)">API Endpoint Migration ✓</div>
+                <div class="on-meta">
+                  <div class="on-meta-item"><span class="repo-dot repo-payments" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> payments-service</div>
+                  <div class="on-meta-item">6/6 sub-objectives</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Level 2 sub-objectives -->
+            <div class="obj-tree">
+              <div class="obj-node">
+                <div class="on-expand" style="visibility:hidden">▸</div>
+                <div class="on-status" style="background:var(--green);width:7px;height:7px"></div>
+                <div class="on-body">
+                  <div class="on-name" style="font-size:12px;color:var(--green)">Replace charges.create → paymentIntents.create ✓</div>
+                  <div class="on-meta"><div class="on-meta-item">routes/pay.js · +84 −31</div></div>
+                </div>
+              </div>
+              <div class="obj-node">
+                <div class="on-expand" style="visibility:hidden">▸</div>
+                <div class="on-status" style="background:var(--green);width:7px;height:7px"></div>
+                <div class="on-body">
+                  <div class="on-name" style="font-size:12px;color:var(--green)">Create PaymentIntent wrapper client ✓</div>
+                  <div class="on-meta"><div class="on-meta-item">lib/stripe-client.js · new file</div></div>
+                </div>
+              </div>
+              <div class="obj-node">
+                <div class="on-expand" style="visibility:hidden">▸</div>
+                <div class="on-status" style="background:var(--green);width:7px;height:7px"></div>
+                <div class="on-body">
+                  <div class="on-name" style="font-size:12px;color:var(--green)">Migrate refund endpoints ✓</div>
+                </div>
+              </div>
+              <div class="obj-node">
+                <div class="on-expand" style="visibility:hidden">▸</div>
+                <div class="on-status" style="background:var(--green);width:7px;height:7px"></div>
+                <div class="on-body">
+                  <div class="on-name" style="font-size:12px;color:var(--green)">Update error handling for new API shape ✓</div>
+                </div>
+              </div>
+              <div class="obj-node">
+                <div class="on-expand" style="visibility:hidden">▸</div>
+                <div class="on-status" style="background:var(--green);width:7px;height:7px"></div>
+                <div class="on-body">
+                  <div class="on-name" style="font-size:12px;color:var(--green)">Add idempotency key support ✓</div>
+                </div>
+              </div>
+              <div class="obj-node">
+                <div class="on-expand" style="visibility:hidden">▸</div>
+                <div class="on-status" style="background:var(--green);width:7px;height:7px"></div>
+                <div class="on-body">
+                  <div class="on-name" style="font-size:12px;color:var(--green)">DB migration: add payment_intent_id column ✓</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Level 1: Webhook Handlers -->
+          <div class="obj-tree">
+            <div class="obj-node">
+              <div class="on-expand">▾</div>
+              <div class="on-status" style="background:var(--accent)"></div>
+              <div class="on-body">
+                <div class="on-name">Webhook Handler Rewrite</div>
+                <div class="on-meta">
+                  <div class="on-meta-item"><span class="repo-dot repo-api" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> api-gateway</div>
+                  <div class="on-meta-item">4/7 sub-objectives</div>
+                  <div class="on-meta-item" style="color:var(--purple)">◈ architecture decision</div>
+                </div>
+                <div class="on-progress"><div class="on-progress-fill" style="width:57%;background:var(--accent)"></div></div>
+                <div class="on-streaming"></div>
+              </div>
+            </div>
+
+            <div class="obj-tree">
+              <div class="obj-node">
+                <div class="on-expand" style="visibility:hidden">▸</div>
+                <div class="on-status" style="background:var(--green);width:7px;height:7px"></div>
+                <div class="on-body">
+                  <div class="on-name" style="font-size:12px;color:var(--green)">payment_intent.succeeded handler ✓</div>
+                </div>
+              </div>
+              <div class="obj-node">
+                <div class="on-expand" style="visibility:hidden">▸</div>
+                <div class="on-status" style="background:var(--green);width:7px;height:7px"></div>
+                <div class="on-body">
+                  <div class="on-name" style="font-size:12px;color:var(--green)">payment_intent.payment_failed handler ✓</div>
+                </div>
+              </div>
+              <div class="obj-node">
+                <div class="on-expand" style="visibility:hidden">▸</div>
+                <div class="on-status" style="background:var(--accent);width:7px;height:7px"></div>
+                <div class="on-body">
+                  <div class="on-name" style="font-size:12px">Dispute/chargeback webhook handlers</div>
+                  <div class="on-streaming" style="max-width:80px"></div>
+                </div>
+              </div>
+              <div class="obj-node">
+                <div class="on-expand" style="visibility:hidden">▸</div>
+                <div class="on-status" style="background:var(--purple);width:7px;height:7px"></div>
+                <div class="on-body">
+                  <div class="on-name" style="font-size:12px">Webhook signature verification strategy</div>
+                  <div class="on-decision-flag architecture">◈ Architecture: shared middleware vs per-handler?</div>
+                </div>
+              </div>
+              <div class="obj-node">
+                <div class="on-expand" style="visibility:hidden">▸</div>
+                <div class="on-status" style="background:var(--green);width:7px;height:7px"></div>
+                <div class="on-body">
+                  <div class="on-name" style="font-size:12px;color:var(--green)">Webhook retry/dedup logic ✓</div>
+                </div>
+              </div>
+              <div class="obj-node">
+                <div class="on-expand" style="visibility:hidden">▸</div>
+                <div class="on-status" style="background:var(--green);width:7px;height:7px"></div>
+                <div class="on-body">
+                  <div class="on-name" style="font-size:12px;color:var(--green)">Event logging & OTEL spans ✓</div>
+                </div>
+              </div>
+              <div class="obj-node">
+                <div class="on-expand" style="visibility:hidden">▸</div>
+                <div class="on-status" style="background:var(--text3);width:7px;height:7px"></div>
+                <div class="on-body">
+                  <div class="on-name" style="font-size:12px;color:var(--text3)">Subscription lifecycle webhooks</div>
+                  <div class="on-meta"><div class="on-meta-item" style="font-size:10px">waiting for architecture decision</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Level 1: Frontend Checkout -->
+          <div class="obj-tree">
+            <div class="obj-node">
+              <div class="on-expand">▸</div>
+              <div class="on-status" style="background:var(--accent)"></div>
+              <div class="on-body">
+                <div class="on-name">Frontend Checkout Rebuild</div>
+                <div class="on-meta">
+                  <div class="on-meta-item"><span class="repo-dot repo-frontend" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> frontend</div>
+                  <div class="on-meta-item">3/5 sub-objectives</div>
+                </div>
+                <div class="on-progress"><div class="on-progress-fill" style="width:60%;background:var(--accent)"></div></div>
+                <div class="on-streaming"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Level 1: Integration Tests -->
+          <div class="obj-tree">
+            <div class="obj-node">
+              <div class="on-expand">▸</div>
+              <div class="on-status" style="background:var(--accent)"></div>
+              <div class="on-body">
+                <div class="on-name">Integration Test Suite</div>
+                <div class="on-meta">
+                  <div class="on-meta-item"><span class="repo-dot repo-payments" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> payments-service</div>
+                  <div class="on-meta-item">3/8 passing</div>
+                  <div class="on-meta-item" style="color:var(--yellow)">depends on: Webhooks</div>
+                </div>
+                <div class="on-progress"><div class="on-progress-fill" style="width:38%;background:var(--yellow)"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Level 1: Canary Deploy -->
+          <div class="obj-tree">
+            <div class="obj-node">
+              <div class="on-expand">▸</div>
+              <div class="on-status" style="background:var(--yellow)"></div>
+              <div class="on-body">
+                <div class="on-name">Canary Validation & Deploy</div>
+                <div class="on-meta">
+                  <div class="on-meta-item"><span class="repo-dot repo-infra" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> infra</div>
+                  <div class="on-meta-item" style="color:var(--yellow)">canary at 5% · 12min elapsed</div>
+                </div>
+                <div class="on-decision-flag deploy">◈ Promote to 25%? Metrics look green.</div>
+                <div class="on-progress"><div class="on-progress-fill" style="width:85%;background:linear-gradient(90deg,var(--yellow),var(--orange));background-size:200% 100%;animation:canaryPulse 2s linear infinite"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Level 1: Scope Management -->
+          <div class="obj-tree">
+            <div class="obj-node">
+              <div class="on-expand">▸</div>
+              <div class="on-status" style="background:var(--accent)"></div>
+              <div class="on-body">
+                <div class="on-name">Scope & Lock Management</div>
+                <div class="on-meta">
+                  <div class="on-meta-item">3 active locks</div>
+                  <div class="on-meta-item" style="color:var(--yellow)">1 queued (Pricing Redesign)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Separator -->
+        <div style="height:24px"></div>
+
+        <!-- Root Objective: Auth v2 (collapsed) -->
+        <div class="obj-tree">
+          <div class="obj-node depth-0">
+            <div class="on-expand">▸</div>
+            <div class="on-status" style="background:var(--green)"></div>
+            <div class="on-body">
+              <div class="on-name">Auth System v2</div>
+              <div class="on-meta">
+                <div class="on-meta-item"><span class="repo-dot repo-auth" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> auth-service</div>
+                <div class="on-meta-item"><span class="repo-dot repo-api" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> api-gateway</div>
+                <div class="on-meta-item">14/16 done</div>
+                <div class="on-meta-item" style="color:var(--yellow)">◈ 1 decision</div>
+              </div>
+              <div class="on-progress"><div class="on-progress-fill" style="width:88%;background:linear-gradient(90deg,var(--green),var(--green2))"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:8px"></div>
+
+        <!-- Root Objective: Mobile v3 (collapsed) -->
+        <div class="obj-tree">
+          <div class="obj-node depth-0">
+            <div class="on-expand">▸</div>
+            <div class="on-status" style="background:var(--orange)"></div>
+            <div class="on-body">
+              <div class="on-name">Mobile App v3</div>
+              <div class="on-meta">
+                <div class="on-meta-item"><span class="repo-dot repo-mobile" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> mobile-app</div>
+                <div class="on-meta-item"><span class="repo-dot repo-api" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> api-gateway</div>
+                <div class="on-meta-item">9/22 done</div>
+                <div class="on-meta-item" style="color:var(--red)">1 error</div>
+                <div class="on-meta-item" style="color:var(--yellow)">◈ 3 decisions</div>
+              </div>
+              <div class="on-progress"><div class="on-progress-fill" style="width:41%;background:linear-gradient(90deg,var(--accent),var(--orange))"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:8px"></div>
+
+        <!-- Root Objective: K8s → Nomad -->
+        <div class="obj-tree">
+          <div class="obj-node depth-0">
+            <div class="on-expand">▸</div>
+            <div class="on-status" style="background:var(--orange)"></div>
+            <div class="on-body">
+              <div class="on-name">K8s → Nomad Migration</div>
+              <div class="on-meta">
+                <div class="on-meta-item"><span class="repo-dot repo-infra" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> infra + 8 repos</div>
+                <div class="on-meta-item">12/34 done</div>
+                <div class="on-meta-item" style="color:var(--yellow)">◈ 5 decisions</div>
+              </div>
+              <div class="on-progress"><div class="on-progress-fill" style="width:35%;background:linear-gradient(90deg,var(--orange),var(--yellow))"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:8px"></div>
+
+        <!-- Root Objective: Invoice PDF (collapsed) -->
+        <div class="obj-tree">
+          <div class="obj-node depth-0">
+            <div class="on-expand">▸</div>
+            <div class="on-status" style="background:var(--accent)"></div>
+            <div class="on-body">
+              <div class="on-name">Invoice PDF Generation</div>
+              <div class="on-meta">
+                <div class="on-meta-item"><span class="repo-dot repo-billing" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> billing-service</div>
+                <div class="on-meta-item">4/12 done</div>
+              </div>
+              <div class="on-progress"><div class="on-progress-fill" style="width:33%;background:var(--accent)"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:8px"></div>
+
+        <!-- Root Objective: Pricing (blocked) -->
+        <div class="obj-tree">
+          <div class="obj-node depth-0" style="opacity:0.5">
+            <div class="on-expand">▸</div>
+            <div class="on-status" style="background:var(--yellow)"></div>
+            <div class="on-body">
+              <div class="on-name">Pricing Page Redesign</div>
+              <div class="on-meta">
+                <div class="on-meta-item"><span class="repo-dot repo-frontend" style="width:6px;height:6px;display:inline-block;border-radius:50%"></span> frontend</div>
+                <div class="on-meta-item" style="color:var(--yellow)">⏳ blocked by Stripe v3 billing/** lock</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Detail panel (right side) -->
+      <div class="tree-detail">
+        <div class="detail-header">
+          <div class="detail-title">Webhook Handler Rewrite</div>
+          <div class="detail-path">Stripe v3 › Webhook Handlers</div>
+          <div class="detail-status-bar">
+            <div class="dsb-item"><div style="width:6px;height:6px;border-radius:50%;background:var(--accent)"></div> In Progress</div>
+            <div class="dsb-item">4/7 done</div>
+            <div class="dsb-item">api-gateway repo</div>
+          </div>
+        </div>
+        <div class="detail-body">
+
+          <div class="detail-section">
+            <div class="detail-section-title">Execution</div>
+            <div class="exec-card">
+              <div class="exec-header">
+                <span class="exec-type agent">agent</span>
+                <span class="exec-status">active · editing webhooks/stripe.js</span>
+              </div>
+              <div class="exec-detail">Claude Code session in worktree feature/stripe-v3-webhooks</div>
+              <div style="height:2px;border-radius:1px;margin-top:6px;background:linear-gradient(90deg,transparent,var(--accent),var(--accent2),transparent);background-size:200% 100%;animation:stream 2s linear infinite"></div>
+            </div>
+            <div class="exec-card">
+              <div class="exec-header">
+                <span class="exec-type pipeline">pipeline</span>
+                <span class="exec-status">watching · CI running</span>
+              </div>
+              <div class="exec-detail">GitHub Actions: test-webhooks.yml — 14/20 jobs passed</div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">Decision Required</div>
+            <div style="padding:12px;border-radius:10px;background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.15)">
+              <div style="font-size:11px;font-weight:600;color:var(--purple);margin-bottom:6px">◈ Architecture Decision</div>
+              <div style="font-size:13px;margin-bottom:8px">Webhook signature verification: shared Express middleware or per-handler verification?</div>
+              <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Shared middleware is cleaner but less flexible for different webhook sources. Per-handler allows custom verification per provider.</div>
+              <div style="display:flex;gap:6px">
+                <button style="flex:1;padding:8px;border-radius:8px;background:rgba(168,85,247,0.1);color:var(--purple);border:none;font-size:12px;font-weight:600;cursor:pointer">Shared Middleware</button>
+                <button style="flex:1;padding:8px;border-radius:8px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);font-size:12px;cursor:pointer">Per-handler</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">Scope Locks</div>
+            <div class="lock-chip exclusive">billing/** EXCLUSIVE</div>
+            <div class="lock-chip shared">api/webhooks/** SHARED</div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">Artifacts (6 files changed)</div>
+            <div class="artifact-row"><span class="artifact-file">webhooks/stripe.js</span><span class="artifact-diff" style="color:var(--accent2)">+120 editing</span></div>
+            <div class="artifact-row"><span class="artifact-file">webhooks/handlers/payment.js</span><span class="artifact-diff" style="color:var(--green)">+45 ✓</span></div>
+            <div class="artifact-row"><span class="artifact-file">webhooks/handlers/dispute.js</span><span class="artifact-diff" style="color:var(--accent2)">+32 editing</span></div>
+            <div class="artifact-row"><span class="artifact-file">webhooks/verify.js</span><span class="artifact-diff">pending decision</span></div>
+            <div class="artifact-row"><span class="artifact-file">test/webhooks.test.js</span><span class="artifact-diff" style="color:var(--green)">+67 ✓</span></div>
+            <div class="artifact-row"><span class="artifact-file">webhooks/retry.js</span><span class="artifact-diff" style="color:var(--green)">+28 ✓</span></div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">Dependencies</div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.8">
+              <div>← <strong>API Migration</strong> <span style="color:var(--green)">✓ complete</span></div>
+              <div>→ <strong>Integration Tests</strong> <span style="color:var(--text3)">waiting for this</span></div>
+              <div>→ <strong>Canary Deploy</strong> <span style="color:var(--text3)">waiting for this</span></div>
+              <div>⊘ <strong>Pricing Redesign</strong> <span style="color:var(--yellow)">lock conflict</span></div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">Timeline</div>
+            <div style="font-size:12px;color:var(--text2);line-height:2">
+              <div><span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:10px">14:12</span> Dispute handler objective started</div>
+              <div><span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:10px">14:07</span> <span style="color:var(--purple)">◈ Architecture decision raised</span></div>
+              <div><span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:10px">14:05</span> payment_failed handler completed</div>
+              <div><span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:10px">13:55</span> payment_succeeded handler completed</div>
+              <div><span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:10px">13:50</span> Retry/dedup logic completed</div>
+              <div><span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:10px">13:45</span> Webhook Handler Rewrite objective started</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ -->
+    <!-- FLOW VIEW                  -->
+    <!-- ══════════════════════════ -->
+    <div class="view" id="view-flow">
+      <div class="flow-canvas">
+        <div class="flow-columns">
+
+          <!-- Column: Queued/Blocked -->
+          <div class="flow-column">
+            <div class="flow-col-header">Blocked / Queued <div class="flow-col-count">8</div></div>
+
+            <div class="flow-node blocked">
+              <div class="fn-name">Pricing Page Redesign</div>
+              <div class="fn-repo"><span style="color:var(--pink)">●</span> frontend</div>
+              <div class="fn-deps">
+                <span class="fn-dep-tag waiting">billing/** locked</span>
+              </div>
+            </div>
+
+            <div class="flow-node blocked">
+              <div class="fn-name">Subscription Webhooks</div>
+              <div class="fn-repo"><span style="color:var(--green)">●</span> api-gateway</div>
+              <div class="fn-deps">
+                <span class="fn-dep-tag waiting">arch decision</span>
+              </div>
+            </div>
+
+            <div class="flow-node blocked">
+              <div class="fn-name">Nomad: auth-service</div>
+              <div class="fn-repo"><span style="color:var(--orange)">●</span> infra</div>
+              <div class="fn-deps">
+                <span class="fn-dep-tag waiting">auth v2</span>
+              </div>
+            </div>
+
+            <div class="flow-node blocked">
+              <div class="fn-name">Push notification v2</div>
+              <div class="fn-repo"><span style="color:var(--cyan)">●</span> mobile</div>
+              <div class="fn-deps">
+                <span class="fn-dep-tag waiting">SMTP fix</span>
+              </div>
+            </div>
+
+            <div class="flow-node blocked" style="opacity:0.5">
+              <div class="fn-name" style="font-size:11px;color:var(--text3)">+ 4 more queued</div>
+            </div>
+          </div>
+
+          <!-- Column: Active -->
+          <div class="flow-column">
+            <div class="flow-col-header">Active <div class="flow-col-count" style="background:rgba(99,102,241,0.15);color:var(--accent2)">47</div></div>
+
+            <div class="flow-node decision">
+              <div class="fn-name">Webhook Handlers</div>
+              <div class="fn-repo"><span style="color:var(--green)">●</span> api-gateway · Stripe v3</div>
+              <div class="fn-bar"><div class="fn-fill" style="width:57%;background:var(--accent)"></div></div>
+              <div class="fn-streaming"></div>
+              <div class="fn-deps">
+                <span class="fn-dep-tag met">API ✓</span>
+                <span class="fn-dep-tag waiting">◈ arch</span>
+              </div>
+            </div>
+
+            <div class="flow-node">
+              <div class="fn-name">Frontend Checkout</div>
+              <div class="fn-repo"><span style="color:var(--pink)">●</span> frontend · Stripe v3</div>
+              <div class="fn-bar"><div class="fn-fill" style="width:60%;background:var(--accent)"></div></div>
+              <div class="fn-streaming"></div>
+            </div>
+
+            <div class="flow-node">
+              <div class="fn-name">JWT Token Rotation</div>
+              <div class="fn-repo"><span style="color:var(--purple)">●</span> auth-service · Auth v2</div>
+              <div class="fn-bar"><div class="fn-fill" style="width:70%;background:var(--green)"></div></div>
+              <div class="fn-streaming"></div>
+            </div>
+
+            <div class="flow-node">
+              <div class="fn-name">Offline Mode Sync</div>
+              <div class="fn-repo"><span style="color:var(--cyan)">●</span> mobile · Mobile v3</div>
+              <div class="fn-bar"><div class="fn-fill" style="width:45%;background:var(--accent)"></div></div>
+              <div class="fn-streaming"></div>
+            </div>
+
+            <div class="flow-node">
+              <div class="fn-name">Invoice Template Engine</div>
+              <div class="fn-repo"><span style="color:var(--yellow)">●</span> billing · Invoice PDF</div>
+              <div class="fn-bar"><div class="fn-fill" style="width:50%;background:var(--accent)"></div></div>
+              <div class="fn-streaming"></div>
+            </div>
+
+            <div class="flow-node">
+              <div class="fn-name">Nomad Job Specs: api-gw</div>
+              <div class="fn-repo"><span style="color:var(--orange)">●</span> infra · K8s→Nomad</div>
+              <div class="fn-bar"><div class="fn-fill" style="width:30%;background:var(--orange)"></div></div>
+              <div class="fn-streaming"></div>
+            </div>
+
+            <div class="flow-node" style="opacity:0.6">
+              <div class="fn-name" style="font-size:11px;color:var(--text3)">+ 41 more active objectives...</div>
+            </div>
+          </div>
+
+          <!-- Column: Validating -->
+          <div class="flow-column">
+            <div class="flow-col-header">Validating <div class="flow-col-count" style="background:rgba(234,179,8,0.15);color:var(--yellow)">6</div></div>
+
+            <div class="flow-node decision">
+              <div class="fn-name">Canary: api-gateway v2.35</div>
+              <div class="fn-repo"><span style="color:var(--accent)">●</span> payments · Stripe v3</div>
+              <div class="fn-bar"><div class="fn-fill" style="width:85%;background:linear-gradient(90deg,var(--yellow),var(--orange));background-size:200% 100%;animation:canaryPulse 2s linear infinite"></div></div>
+              <div style="font-size:10px;color:var(--yellow);margin-top:6px">5% → 25% · 12min elapsed</div>
+              <div class="fn-deps">
+                <span class="fn-dep-tag waiting">◈ promote?</span>
+              </div>
+            </div>
+
+            <div class="flow-node">
+              <div class="fn-name">Integration Tests</div>
+              <div class="fn-repo"><span style="color:var(--accent)">●</span> payments · Stripe v3</div>
+              <div class="fn-bar"><div class="fn-fill" style="width:38%;background:var(--yellow)"></div></div>
+              <div style="font-size:10px;color:var(--text3);margin-top:4px">3/8 passing</div>
+            </div>
+
+            <div class="flow-node">
+              <div class="fn-name">Auth middleware tests</div>
+              <div class="fn-repo"><span style="color:var(--purple)">●</span> auth · Auth v2</div>
+              <div class="fn-bar"><div class="fn-fill" style="width:90%;background:var(--green)"></div></div>
+              <div style="font-size:10px;color:var(--text3);margin-top:4px">18/20 passing</div>
+            </div>
+
+            <div class="flow-node decision">
+              <div class="fn-name">Nomad: terraform plan</div>
+              <div class="fn-repo"><span style="color:var(--orange)">●</span> infra · K8s→Nomad</div>
+              <div class="fn-deps">
+                <span class="fn-dep-tag waiting">◈ approve plan?</span>
+              </div>
+            </div>
+
+            <div class="flow-node" style="opacity:0.6">
+              <div class="fn-name" style="font-size:11px;color:var(--text3)">+ 2 more validating</div>
+            </div>
+          </div>
+
+          <!-- Column: Deploying -->
+          <div class="flow-column">
+            <div class="flow-col-header">Deploying <div class="flow-col-count" style="background:rgba(34,197,94,0.15);color:var(--green)">3</div></div>
+
+            <div class="flow-node">
+              <div class="fn-name">Auth v2: session service</div>
+              <div class="fn-repo"><span style="color:var(--purple)">●</span> auth · canary 50%</div>
+              <div class="fn-bar"><div class="fn-fill" style="width:60%;background:var(--green)"></div></div>
+              <div style="font-size:10px;color:var(--green);margin-top:4px">all metrics green · 8min at 50%</div>
+            </div>
+
+            <div class="flow-node">
+              <div class="fn-name">Mobile v3: deep linking</div>
+              <div class="fn-repo"><span style="color:var(--cyan)">●</span> mobile · TestFlight</div>
+              <div class="fn-bar"><div class="fn-fill" style="width:100%;background:var(--green)"></div></div>
+            </div>
+
+            <div class="flow-node" style="opacity:0.6">
+              <div class="fn-name" style="font-size:11px;color:var(--text3)">+ 1 more deploying</div>
+            </div>
+          </div>
+
+          <!-- Column: Complete -->
+          <div class="flow-column">
+            <div class="flow-col-header">Complete Today <div class="flow-col-count">41</div></div>
+
+            <div class="flow-node complete">
+              <div class="fn-name" style="color:var(--green)">✓ API Endpoint Migration</div>
+              <div class="fn-repo"><span style="color:var(--accent)">●</span> payments · Stripe v3</div>
+              <div style="font-size:10px;color:var(--text3);margin-top:4px">deployed 11:30 · 6 sub-objectives</div>
+            </div>
+
+            <div class="flow-node complete">
+              <div class="fn-name" style="color:var(--green)">✓ Refund Flow</div>
+              <div class="fn-repo"><span style="color:var(--accent)">●</span> payments</div>
+              <div style="font-size:10px;color:var(--text3);margin-top:4px">deployed 11:30 · canary → 100% in 45min</div>
+            </div>
+
+            <div class="flow-node complete">
+              <div class="fn-name" style="color:var(--green)">✓ Rate Limiter Upgrade</div>
+              <div class="fn-repo"><span style="color:var(--green)">●</span> api-gateway</div>
+              <div style="font-size:10px;color:var(--text3);margin-top:4px">deployed 09:15 · zero incidents</div>
+            </div>
+
+            <div class="flow-node complete">
+              <div class="fn-name" style="color:var(--green)">✓ Push Notification v1</div>
+              <div class="fn-repo"><span style="color:var(--cyan)">●</span> mobile</div>
+              <div style="font-size:10px;color:var(--text3);margin-top:4px">deployed 08:40</div>
+            </div>
+
+            <div class="flow-node complete" style="opacity:0.3">
+              <div class="fn-name" style="font-size:11px;color:var(--text3)">+ 37 more completed today</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ -->
+    <!-- DECISIONS VIEW              -->
+    <!-- ══════════════════════════ -->
+    <div class="view" id="view-decisions">
+      <div style="padding:20px 20px 0;font-size:11px;color:var(--text3)">12 decisions waiting · sorted by impact & urgency</div>
+      <div class="decisions-grid" style="overflow-y:auto;flex:1">
+
+        <!-- Decision 1: Canary promotion -->
+        <div class="decision-card">
+          <div class="dc-type deploy">◈ Deploy Gate</div>
+          <div class="dc-source">Stripe v3 › Canary Validation</div>
+          <div class="dc-question">Promote canary from 5% to 25%?</div>
+          <div class="dc-evidence">
+            <div class="dc-ev"><div class="dc-ev-value" style="color:var(--green)">31ms</div><div class="dc-ev-label">p99 latency</div></div>
+            <div class="dc-ev"><div class="dc-ev-value" style="color:var(--green)">0.01%</div><div class="dc-ev-label">error rate</div></div>
+            <div class="dc-ev"><div class="dc-ev-value" style="color:var(--green)">99.3%</div><div class="dc-ev-label">success rate</div></div>
+          </div>
+          <div class="dc-actions">
+            <button class="dc-btn approve">Promote to 25%</button>
+            <button class="dc-btn option">Hold at 5%</button>
+            <button class="dc-btn reject">Rollback</button>
+          </div>
+          <div class="dc-impact">↳ 3 objectives waiting on this · blocking Pricing Redesign session</div>
+        </div>
+
+        <!-- Decision 2: Architecture -->
+        <div class="decision-card">
+          <div class="dc-type architecture">◈ Architecture</div>
+          <div class="dc-source">Stripe v3 › Webhook Handlers</div>
+          <div class="dc-question">Webhook signature verification: shared middleware or per-handler?</div>
+          <div class="dc-context">Shared middleware: cleaner, DRY, but all webhooks must use same verification.\nPer-handler: more flexible, supports multi-provider, but duplicates logic.</div>
+          <div class="dc-actions">
+            <button class="dc-btn option">Shared Middleware</button>
+            <button class="dc-btn option">Per-handler</button>
+          </div>
+          <div class="dc-impact">↳ 2 sub-objectives blocked · subscription webhooks waiting</div>
+        </div>
+
+        <!-- Decision 3: Terraform plan -->
+        <div class="decision-card">
+          <div class="dc-type deploy">◈ Deploy Gate</div>
+          <div class="dc-source">K8s → Nomad › Terraform Plan</div>
+          <div class="dc-question">Apply terraform plan? 14 resources to add, 3 to modify, 0 to destroy.</div>
+          <div class="dc-context">Plan creates Nomad job specs for api-gateway, payment-service, and event-queue. Modifies load balancer targets.</div>
+          <div class="dc-actions">
+            <button class="dc-btn approve">Apply Plan</button>
+            <button class="dc-btn reject">Reject</button>
+          </div>
+          <div class="dc-impact">↳ 8 service migration objectives waiting on infra</div>
+        </div>
+
+        <!-- Decision 4: Scope conflict -->
+        <div class="decision-card">
+          <div class="dc-type conflict">◈ Scope Conflict</div>
+          <div class="dc-source">K8s → Nomad vs Auth v2</div>
+          <div class="dc-question">Both sessions want to modify api-gateway/config/routes.yml. Allow concurrent edits?</div>
+          <div class="dc-context">Nomad migration needs to update service discovery endpoints.\nAuth v2 needs to add new auth middleware routes.\nDifferent sections of the file — low conflict risk.</div>
+          <div class="dc-actions">
+            <button class="dc-btn approve">Allow (SHARED lock)</button>
+            <button class="dc-btn option">Queue Nomad</button>
+            <button class="dc-btn option">Queue Auth</button>
+          </div>
+        </div>
+
+        <!-- Decision 5: Error needs human -->
+        <div class="decision-card" style="border-color:rgba(239,68,68,0.3)">
+          <div class="dc-type" style="background:rgba(239,68,68,0.1);color:var(--red)">⚠ Error</div>
+          <div class="dc-source">Mobile v3 › Push Notification Service</div>
+          <div class="dc-question">SMTP connection refused on staging. Credentials expired?</div>
+          <div class="dc-context">Error: connect ECONNREFUSED 10.0.3.42:587\nLast working: 2 hours ago. SendGrid status page shows no outages.</div>
+          <div class="dc-actions">
+            <button class="dc-btn option">Retry with new creds</button>
+            <button class="dc-btn option">Switch to SES</button>
+            <button class="dc-btn reject">Abort objective</button>
+          </div>
+          <div class="dc-impact">↳ 3 mobile objectives blocked downstream</div>
+        </div>
+
+        <!-- Decision 6: Scope expansion -->
+        <div class="decision-card">
+          <div class="dc-type scope">◈ Scope Expansion</div>
+          <div class="dc-source">Auth v2 › Session Management</div>
+          <div class="dc-question">Token rotation requires updating 12 microservices that cache JWTs. Expand scope?</div>
+          <div class="dc-context">Current scope: auth-service, api-gateway, shared-lib.\nExpanded scope: + 12 services that import shared-lib/auth.\nEstimated additional work: ~20 sub-objectives.</div>
+          <div class="dc-actions">
+            <button class="dc-btn approve">Expand scope (+12 services)</button>
+            <button class="dc-btn option">Partial (top 5 services)</button>
+            <button class="dc-btn reject">Keep current scope</button>
+          </div>
+          <div class="dc-impact">↳ Will add ~20 objectives · may conflict with Nomad migration</div>
+        </div>
+
+        <!-- Decision 7-12: Compact cards for the remaining ones -->
+        <div class="decision-card" style="opacity:0.8">
+          <div class="dc-type deploy">◈ Deploy Gate</div>
+          <div class="dc-source">Auth v2 › Session Service Canary</div>
+          <div class="dc-question">Promote session service canary from 50% to 100%?</div>
+          <div class="dc-actions">
+            <button class="dc-btn approve">Promote to 100%</button>
+            <button class="dc-btn reject">Rollback</button>
+          </div>
+        </div>
+
+        <div class="decision-card" style="opacity:0.8">
+          <div class="dc-type architecture">◈ Architecture</div>
+          <div class="dc-source">K8s → Nomad › Service Mesh</div>
+          <div class="dc-question">Consul Connect or Nomad native service discovery?</div>
+          <div class="dc-actions">
+            <button class="dc-btn option">Consul Connect</button>
+            <button class="dc-btn option">Nomad Native</button>
+          </div>
+        </div>
+
+        <div class="decision-card" style="opacity:0.7">
+          <div class="dc-type scope">◈ Scope</div>
+          <div class="dc-source">K8s → Nomad › Monitoring</div>
+          <div class="dc-question">Migrate Prometheus stack to Nomad or keep separate?</div>
+          <div class="dc-actions">
+            <button class="dc-btn option">Migrate</button>
+            <button class="dc-btn option">Keep separate</button>
+          </div>
+        </div>
+
+        <div class="decision-card" style="opacity:0.7">
+          <div class="dc-type deploy">◈ Deploy Gate</div>
+          <div class="dc-source">Mobile v3 › Deep Linking</div>
+          <div class="dc-question">TestFlight build looks good. Push to App Store review?</div>
+          <div class="dc-actions">
+            <button class="dc-btn approve">Submit</button>
+            <button class="dc-btn option">Wait for Push v2</button>
+          </div>
+        </div>
+
+        <div class="decision-card" style="opacity:0.6">
+          <div class="dc-type architecture">◈ Architecture</div>
+          <div class="dc-source">Invoice PDF › Template Engine</div>
+          <div class="dc-question">React-pdf or Puppeteer for PDF rendering?</div>
+          <div class="dc-actions">
+            <button class="dc-btn option">React-pdf</button>
+            <button class="dc-btn option">Puppeteer</button>
+          </div>
+        </div>
+
+        <div class="decision-card" style="opacity:0.6">
+          <div class="dc-type conflict">◈ Conflict</div>
+          <div class="dc-source">K8s → Nomad vs Stripe v3</div>
+          <div class="dc-question">Both need to modify deploy pipeline for payment-service. Sequence?</div>
+          <div class="dc-actions">
+            <button class="dc-btn option">Stripe first</button>
+            <button class="dc-btn option">Nomad first</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════ -->
+    <!-- OTEL VIEW                  -->
+    <!-- ══════════════════════════ -->
+    <div class="view" id="view-otel">
+      <div class="otel-row">
+        <div class="otel-card">
+          <div class="oc-title">Objectives Throughput</div>
+          <div class="oc-sub">completed per hour · all sessions · last 12h</div>
+          <div class="oc-chart">
+            <svg viewBox="0 0 600 100" preserveAspectRatio="none">
+              <defs><linearGradient id="tp1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity="0.3"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+              <path d="M0,85 C25,82 50,78 75,80 C100,75 125,70 150,72 C175,68 200,60 225,55 C250,50 275,45 300,40 C325,38 350,35 375,30 C400,28 425,32 450,28 C475,25 500,22 525,20 C550,18 575,15 600,12" stroke="var(--accent)" stroke-width="2" fill="none"/>
+              <path d="M0,85 C25,82 50,78 75,80 C100,75 125,70 150,72 C175,68 200,60 225,55 C250,50 275,45 300,40 C325,38 350,35 375,30 C400,28 425,32 450,28 C475,25 500,22 525,20 C550,18 575,15 600,12 V100 H0 Z" fill="url(#tp1)"/>
+            </svg>
+            <div style="position:absolute;right:12px;top:8px;font-size:20px;font-weight:700;color:var(--accent2);font-family:'JetBrains Mono',monospace">3.2/hr</div>
+            <div style="position:absolute;left:8px;bottom:4px;font-size:9px;color:var(--text3)">-12h</div>
+            <div style="position:absolute;right:8px;bottom:4px;font-size:9px;color:var(--text3)">now</div>
+          </div>
+        </div>
+        <div class="otel-card">
+          <div class="oc-title">Decision Response Time</div>
+          <div class="oc-sub">avg human response · last 12h</div>
+          <div class="oc-chart">
+            <svg viewBox="0 0 600 100" preserveAspectRatio="none">
+              <defs><linearGradient id="dt1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--yellow)" stop-opacity="0.2"/><stop offset="100%" stop-color="var(--yellow)" stop-opacity="0"/></linearGradient></defs>
+              <path d="M0,30 C50,35 100,40 150,38 C200,42 250,50 300,45 C350,40 400,35 450,30 C500,28 550,32 600,25" stroke="var(--yellow)" stroke-width="2" fill="none"/>
+              <path d="M0,30 C50,35 100,40 150,38 C200,42 250,50 300,45 C350,40 400,35 450,30 C500,28 550,32 600,25 V100 H0 Z" fill="url(#dt1)"/>
+            </svg>
+            <div style="position:absolute;right:12px;top:8px;font-size:20px;font-weight:700;color:var(--yellow);font-family:'JetBrains Mono',monospace">2.4min</div>
+          </div>
+        </div>
+      </div>
+      <div class="otel-row">
+        <div class="otel-card">
+          <div class="oc-title">API Gateway — Latency</div>
+          <div class="oc-sub">p50 / p95 / p99 · last 6 hours · canary deploy marked</div>
+          <div class="oc-chart">
+            <svg viewBox="0 0 600 100" preserveAspectRatio="none">
+              <path d="M0,60 C100,59 200,61 300,60 C350,58 380,52 400,48 C420,45 500,50 600,48" stroke="var(--green)" stroke-width="1" fill="none" opacity="0.5"/>
+              <path d="M0,45 C100,44 200,46 300,45 C350,42 380,36 400,30 C420,28 500,34 600,32" stroke="var(--accent)" stroke-width="1.5" fill="none"/>
+              <path d="M0,35 C100,34 200,36 300,35 C350,30 380,22 400,16 C420,20 500,26 600,24" stroke="var(--yellow)" stroke-width="2" fill="none"/>
+            </svg>
+            <div style="position:absolute;left:65%;top:0;bottom:0;width:1px;background:var(--yellow);opacity:0.3"></div>
+            <div style="position:absolute;left:65%;top:4px;transform:translateX(-50%);font-size:9px;color:var(--yellow);background:rgba(234,179,8,0.15);padding:1px 4px;border-radius:3px">▼ canary</div>
+          </div>
+        </div>
+        <div class="otel-card">
+          <div class="oc-title">Active Objectives by Session</div>
+          <div class="oc-sub">real-time distribution</div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <div style="flex:1;text-align:center">
+              <div style="height:60px;display:flex;align-items:flex-end;justify-content:center">
+                <div style="width:28px;border-radius:4px 4px 0 0;background:var(--accent);height:45px"></div>
+              </div>
+              <div style="font-size:10px;color:var(--text3);margin-top:4px">Stripe</div>
+              <div style="font-size:11px;font-weight:600">18</div>
+            </div>
+            <div style="flex:1;text-align:center">
+              <div style="height:60px;display:flex;align-items:flex-end;justify-content:center">
+                <div style="width:28px;border-radius:4px 4px 0 0;background:var(--purple);height:20px"></div>
+              </div>
+              <div style="font-size:10px;color:var(--text3);margin-top:4px">Auth</div>
+              <div style="font-size:11px;font-weight:600">8</div>
+            </div>
+            <div style="flex:1;text-align:center">
+              <div style="height:60px;display:flex;align-items:flex-end;justify-content:center">
+                <div style="width:28px;border-radius:4px 4px 0 0;background:var(--cyan);height:35px"></div>
+              </div>
+              <div style="font-size:10px;color:var(--text3);margin-top:4px">Mobile</div>
+              <div style="font-size:11px;font-weight:600">13</div>
+            </div>
+            <div style="flex:1;text-align:center">
+              <div style="height:60px;display:flex;align-items:flex-end;justify-content:center">
+                <div style="width:28px;border-radius:4px 4px 0 0;background:var(--orange);height:55px"></div>
+              </div>
+              <div style="font-size:10px;color:var(--text3);margin-top:4px">Nomad</div>
+              <div style="font-size:11px;font-weight:600">22</div>
+            </div>
+            <div style="flex:1;text-align:center">
+              <div style="height:60px;display:flex;align-items:flex-end;justify-content:center">
+                <div style="width:28px;border-radius:4px 4px 0 0;background:var(--yellow);height:15px"></div>
+              </div>
+              <div style="font-size:10px;color:var(--text3);margin-top:4px">Invoice</div>
+              <div style="font-size:11px;font-weight:600">6</div>
+            </div>
+            <div style="flex:1;text-align:center">
+              <div style="height:60px;display:flex;align-items:flex-end;justify-content:center">
+                <div style="width:28px;border-radius:4px 4px 0 0;background:var(--pink);height:5px;opacity:0.5"></div>
+              </div>
+              <div style="font-size:10px;color:var(--text3);margin-top:4px">Pricing</div>
+              <div style="font-size:11px;font-weight:600;color:var(--yellow)">⏳</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ── View switching ──
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+  document.querySelectorAll('.tvp').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.rail-btn').forEach(b => b.classList.remove('active'));
+  event.target.closest('.tvp, .rail-btn')?.classList.add('active');
+  // Sync both nav elements
+  const viewNames = ['galaxy','tree','flow','decisions','otel'];
+  const idx = viewNames.indexOf(id);
+  document.querySelectorAll('.tvp')[idx]?.classList.add('active');
+  document.querySelectorAll('.rail-btn')[idx]?.classList.add('active');
+  if (id === 'galaxy') renderGalaxy();
+}
+
+function selectSession(el) {
+  document.querySelectorAll('.session-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ── Galaxy: Force-directed dependency graph ──
+const REPOS = ['payments','api-gw','frontend','infra','mobile','auth','billing','events','shared','docs'];
+const REPO_COLORS = {
+  'payments':'#6366f1','api-gw':'#22c55e','frontend':'#ec4899','infra':'#f97316',
+  'mobile':'#22d3ee','auth':'#a855f7','billing':'#eab308','events':'#ef4444',
+  'shared':'#a5b4fc','docs':'#4a4a6a'
+};
+const SESSIONS = [
+  { name: 'Stripe v3', count: 24, color: '#6366f1' },
+  { name: 'Auth v2', count: 16, color: '#a855f7' },
+  { name: 'Mobile v3', count: 22, color: '#22d3ee' },
+  { name: 'Invoice PDF', count: 12, color: '#eab308' },
+  { name: 'K8s→Nomad', count: 34, color: '#f97316' },
+];
+
+function generateObjectives() {
+  const objectives = [];
+  let id = 0;
+  const statuses = ['active','complete','blocked','decision'];
+  const statusWeights = [0.44, 0.38, 0.07, 0.11];
+
+  SESSIONS.forEach((session, si) => {
+    for (let i = 0; i < session.count; i++) {
+      const r = Math.random();
+      let status = 'active';
+      let cumulative = 0;
+      for (let s = 0; s < statuses.length; s++) {
+        cumulative += statusWeights[s];
+        if (r < cumulative) { status = statuses[s]; break; }
+      }
+      const repo = REPOS[Math.floor(Math.random() * 8)];
+      objectives.push({
+        id: id++,
+        session: si,
+        sessionName: session.name,
+        repo,
+        status,
+        x: 0, y: 0, vx: 0, vy: 0,
+        radius: status === 'decision' ? 7 : (status === 'complete' ? 4 : 5.5),
+      });
+    }
+  });
+
+  // Generate dependencies (mostly within session, some cross-session)
+  const edges = [];
+  objectives.forEach((obj, i) => {
+    if (Math.random() < 0.6 && i > 0) {
+      // Find a same-session predecessor
+      const sameSession = objectives.filter((o, j) => j < i && o.session === obj.session);
+      if (sameSession.length) {
+        const from = sameSession[Math.floor(Math.random() * sameSession.length)];
+        edges.push({ from: from.id, to: obj.id, cross: false });
+      }
+    }
+    // Cross-session dependency (rare)
+    if (Math.random() < 0.08 && i > 10) {
+      const other = objectives[Math.floor(Math.random() * Math.min(i, objectives.length))];
+      if (other.session !== obj.session) {
+        edges.push({ from: other.id, to: obj.id, cross: true });
+      }
+    }
+  });
+
+  return { objectives, edges };
+}
+
+let galaxyData = null;
+let zoom = 1;
+let panX = 0, panY = 0;
+
+function renderGalaxy() {
+  const svg = document.getElementById('galaxy-svg');
+  const rect = svg.getBoundingClientRect();
+  const W = rect.width || 1200;
+  const H = rect.height || 700;
+
+  if (!galaxyData) {
+    galaxyData = generateObjectives();
+    // Initial layout: cluster by session
+    const cx = W / 2, cy = H / 2;
+    const sessionAngles = SESSIONS.map((_, i) => (i / SESSIONS.length) * Math.PI * 2 - Math.PI / 2);
+
+    galaxyData.objectives.forEach(obj => {
+      const angle = sessionAngles[obj.session];
+      const clusterR = Math.min(W, H) * 0.25;
+      const spread = 80;
+      obj.x = cx + Math.cos(angle) * clusterR + (Math.random() - 0.5) * spread;
+      obj.y = cy + Math.sin(angle) * clusterR + (Math.random() - 0.5) * spread;
+    });
+
+    // Simple force simulation (run synchronously for initial layout)
+    for (let tick = 0; tick < 80; tick++) {
+      // Repulsion between all nodes
+      for (let i = 0; i < galaxyData.objectives.length; i++) {
+        for (let j = i + 1; j < galaxyData.objectives.length; j++) {
+          const a = galaxyData.objectives[i], b = galaxyData.objectives[j];
+          let dx = b.x - a.x, dy = b.y - a.y;
+          let dist = Math.sqrt(dx*dx + dy*dy) || 1;
+          let force = -200 / (dist * dist);
+          let fx = (dx / dist) * force, fy = (dy / dist) * force;
+          a.vx -= fx; a.vy -= fy;
+          b.vx += fx; b.vy += fy;
+        }
+      }
+
+      // Attraction along edges
+      galaxyData.edges.forEach(e => {
+        const a = galaxyData.objectives[e.from], b = galaxyData.objectives[e.to];
+        if (!a || !b) return;
+        let dx = b.x - a.x, dy = b.y - a.y;
+        let dist = Math.sqrt(dx*dx + dy*dy) || 1;
+        let force = (dist - 40) * 0.005;
+        let fx = (dx / dist) * force, fy = (dy / dist) * force;
+        a.vx += fx; a.vy += fy;
+        b.vx -= fx; b.vy -= fy;
+      });
+
+      // Session cluster gravity
+      galaxyData.objectives.forEach(obj => {
+        const angle = (obj.session / SESSIONS.length) * Math.PI * 2 - Math.PI / 2;
+        const clusterR = Math.min(W, H) * 0.25;
+        const targetX = cx + Math.cos(angle) * clusterR;
+        const targetY = cy + Math.sin(angle) * clusterR;
+        obj.vx += (targetX - obj.x) * 0.01;
+        obj.vy += (targetY - obj.y) * 0.01;
+      });
+
+      // Center gravity
+      galaxyData.objectives.forEach(obj => {
+        obj.vx += (cx - obj.x) * 0.001;
+        obj.vy += (cy - obj.y) * 0.001;
+      });
+
+      // Apply velocity with damping
+      galaxyData.objectives.forEach(obj => {
+        obj.vx *= 0.8;
+        obj.vy *= 0.8;
+        obj.x += obj.vx;
+        obj.y += obj.vy;
+      });
+    }
+  }
+
+  // Render SVG
+  const statusColors = {
+    active: 'var(--accent2)',
+    complete: 'var(--green)',
+    blocked: 'var(--red)',
+    decision: 'var(--yellow)',
+  };
+
+  let html = `<g transform="translate(${panX},${panY}) scale(${zoom})">`;
+
+  // Edges
+  galaxyData.edges.forEach(e => {
+    const a = galaxyData.objectives[e.from], b = galaxyData.objectives[e.to];
+    if (!a || !b) return;
+    const cls = e.cross ? 'g-edge critical' : 'g-edge';
+    html += `<line class="${cls}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
+  });
+
+  // Session cluster labels
+  const cx = W / 2, cy = H / 2;
+  SESSIONS.forEach((session, i) => {
+    const angle = (i / SESSIONS.length) * Math.PI * 2 - Math.PI / 2;
+    const clusterR = Math.min(W, H) * 0.25;
+    const lx = cx + Math.cos(angle) * (clusterR + 60);
+    const ly = cy + Math.sin(angle) * (clusterR + 60);
+    html += `<text x="${lx}" y="${ly}" text-anchor="middle" fill="${session.color}" font-size="11" font-weight="600" font-family="Inter,sans-serif" opacity="0.7">${session.name}</text>`;
+    html += `<text x="${lx}" y="${ly + 14}" text-anchor="middle" fill="var(--text3)" font-size="9" font-family="Inter,sans-serif">${session.count} objectives</text>`;
+  });
+
+  // Nodes
+  galaxyData.objectives.forEach(obj => {
+    const color = statusColors[obj.status];
+    const repoColor = REPO_COLORS[obj.repo] || '#4a4a6a';
+    const glowClass = obj.status === 'active' ? 'node-active' : '';
+    const opacity = obj.status === 'complete' ? 0.4 : 1;
+
+    html += `<g class="g-node ${glowClass}" style="opacity:${opacity}" data-id="${obj.id}">`;
+    html += `<circle cx="${obj.x}" cy="${obj.y}" r="${obj.radius}" fill="${color}" stroke="${repoColor}" stroke-width="1.5" style="color:${color}"/>`;
+
+    // Decision indicator
+    if (obj.status === 'decision') {
+      html += `<circle cx="${obj.x}" cy="${obj.y}" r="${obj.radius + 4}" fill="none" stroke="${color}" stroke-width="0.5" opacity="0.5">`;
+      html += `<animate attributeName="r" values="${obj.radius + 2};${obj.radius + 8};${obj.radius + 2}" dur="2s" repeatCount="indefinite"/>`;
+      html += `<animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite"/>`;
+      html += `</circle>`;
+    }
+
+    // Active streaming indicator
+    if (obj.status === 'active' && Math.random() > 0.5) {
+      html += `<circle cx="${obj.x}" cy="${obj.y}" r="${obj.radius + 2}" fill="none" stroke="${color}" stroke-width="0.5" opacity="0.3"/>`;
+    }
+
+    html += `</g>`;
+  });
+
+  html += `</g>`;
+  svg.innerHTML = html;
+}
+
+function zoomIn() { zoom = Math.min(zoom * 1.3, 4); renderGalaxy(); }
+function zoomOut() { zoom = Math.max(zoom / 1.3, 0.3); renderGalaxy(); }
+function zoomFit() { zoom = 1; panX = 0; panY = 0; renderGalaxy(); }
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', e => {
+  if (e.key === '1') showViewDirect('galaxy');
+  if (e.key === '2') showViewDirect('tree');
+  if (e.key === '3') showViewDirect('flow');
+  if (e.key === '4') showViewDirect('decisions');
+  if (e.key === '5') showViewDirect('otel');
+});
+
+function showViewDirect(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+  const viewNames = ['galaxy','tree','flow','decisions','otel'];
+  const idx = viewNames.indexOf(id);
+  document.querySelectorAll('.tvp').forEach((t,i) => t.classList.toggle('active', i === idx));
+  document.querySelectorAll('.rail-btn').forEach((b,i) => b.classList.toggle('active', i === idx));
+  if (id === 'galaxy') renderGalaxy();
+}
+
+// ── Pan on galaxy ──
+let isDragging = false, dragStartX, dragStartY;
+document.getElementById('galaxy-svg')?.addEventListener('mousedown', e => {
+  isDragging = true; dragStartX = e.clientX - panX; dragStartY = e.clientY - panY;
+});
+document.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  panX = e.clientX - dragStartX;
+  panY = e.clientY - dragStartY;
+  renderGalaxy();
+});
+document.addEventListener('mouseup', () => isDragging = false);
+
+// ── Init ──
+window.addEventListener('load', () => {
+  renderGalaxy();
+});
+window.addEventListener('resize', renderGalaxy);
+
+@keyframes canaryPulse { 0% { background-position: 0% 0; } 100% { background-position: 200% 0; } }
+</script>
+
+</body>
+</html>

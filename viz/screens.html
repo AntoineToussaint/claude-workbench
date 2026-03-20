@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS — Multi-Screen Layouts</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#04040a;--bg2:#080812;--sf:#0c0c18;--sf2:#12122a;--sf3:#181838;
+  --b1:#1a1a35;--b2:#252550;
+  --t1:#e4e4f0;--t2:#7878a0;--t3:#4a4a6a;
+  --ac:#6366f1;--ac2:#818cf8;--ac3:#a5b4fc;
+  --g:#22c55e;--g2:#4ade80;--r:#ef4444;--r2:#f87171;
+  --y:#eab308;--o:#f97316;--c:#22d3ee;--p:#a855f7;
+}
+html,body{height:100%;overflow-x:hidden}
+body{background:#020208;color:var(--t1);font-family:'Inter',system-ui,sans-serif}
+
+/* ── Config bar ── */
+.config-bar{
+  position:fixed;top:0;left:0;right:0;z-index:1000;
+  display:flex;align-items:center;gap:0;
+  background:rgba(8,8,18,0.95);border-bottom:1px solid var(--b1);
+  backdrop-filter:blur(20px);padding:0 24px;height:56px;
+}
+.config-title{font-size:14px;font-weight:700;letter-spacing:-0.5px;margin-right:24px;color:var(--ac2)}
+.config-btn{
+  padding:10px 20px;font-size:12px;font-weight:600;
+  color:var(--t2);background:none;border:none;cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .15s;
+  height:56px;display:flex;align-items:center;
+}
+.config-btn:hover{color:var(--t1);background:rgba(99,102,241,0.05)}
+.config-btn.active{color:var(--ac2);border-bottom-color:var(--ac)}
+.config-sub{font-size:10px;color:var(--t3);margin-left:auto;font-family:'JetBrains Mono',monospace}
+
+/* ── Layout container ── */
+.layout-view{display:none;padding-top:80px;padding-bottom:40px;min-height:100vh}
+.layout-view.active{display:block}
+.layout-label{text-align:center;margin-bottom:24px}
+.layout-label h2{font-size:20px;font-weight:800;letter-spacing:-0.5px;margin-bottom:4px}
+.layout-label p{font-size:13px;color:var(--t2)}
+
+/* ── Desk surface ── */
+.desk{
+  position:relative;margin:0 auto;
+  background:radial-gradient(ellipse at center, rgba(99,102,241,0.03) 0%, transparent 70%);
+  border-radius:20px;
+}
+
+/* ── Monitor frame ── */
+.monitor{
+  background:var(--bg);border:2px solid var(--b1);border-radius:12px;
+  overflow:hidden;position:relative;
+  box-shadow:0 8px 32px rgba(0,0,0,0.6), 0 0 80px rgba(99,102,241,0.03);
+}
+.monitor::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
+  z-index:10;
+}
+.monitor-stand{
+  width:60px;height:20px;background:var(--b1);margin:0 auto;
+  border-radius:0 0 8px 8px;
+}
+.monitor-base{
+  width:100px;height:6px;background:var(--b1);margin:0 auto;
+  border-radius:3px;margin-top:-1px;
+}
+
+/* ── Screen content (miniaturized NEXUS) ── */
+.screen-content{width:100%;height:100%;overflow:hidden;position:relative}
+
+/* ── Miniature NEXUS components ── */
+.nx-sidebar{position:absolute;top:0;left:0;bottom:0;background:var(--sf);border-right:1px solid var(--b1);display:flex;flex-direction:column}
+.nx-logo{display:flex;align-items:center;gap:3px;padding:6px 5px;border-bottom:1px solid var(--b1)}
+.nx-logo-icon{width:10px;height:10px;border-radius:2px;background:linear-gradient(135deg,var(--ac),var(--p));display:flex;align-items:center;justify-content:center;font-size:5px;font-weight:800;color:#fff}
+.nx-logo-text{font-size:5px;font-weight:700}
+.nx-pulse{display:flex;align-items:center;gap:2px;padding:3px 5px;margin:3px;border-radius:3px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.1)}
+.nx-pulse-dot{width:3px;height:3px;border-radius:50%;background:var(--g);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.nx-pulse-text{font-size:3.5px;color:var(--g)}
+.nx-nav{flex:1;padding:3px}
+.nx-nav-sec{font-size:3px;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;padding:2px 3px;margin-bottom:1px}
+.nx-nav-item{font-size:4px;padding:2px 3px;border-radius:2px;color:var(--t2);cursor:pointer;display:flex;align-items:center;gap:2px}
+.nx-nav-item.active{background:rgba(99,102,241,0.1);color:var(--ac2)}
+.nx-nav-item .dot{width:3px;height:3px;border-radius:50%}
+.nx-nav-badge{margin-left:auto;font-size:3px;padding:0 2px;border-radius:1px;font-weight:600}
+.nx-nav-badge.alert{background:rgba(239,68,68,0.12);color:var(--r)}
+.nx-nav-badge.info{background:rgba(99,102,241,0.12);color:var(--ac2)}
+.nx-nav-badge.warn{background:rgba(234,179,8,0.12);color:var(--y)}
+.nx-nav-tree{margin-left:8px}
+.nx-nav-tree .nx-nav-item{font-size:3.5px}
+
+/* Topbar */
+.nx-topbar{height:16px;background:var(--bg2);border-bottom:1px solid var(--b1);display:flex;align-items:center;padding:0 6px;gap:4px}
+.nx-crumb{font-size:4px;color:var(--t2)}
+.nx-crumb strong{color:var(--t1)}
+.nx-topbar-right{margin-left:auto;display:flex;align-items:center;gap:4px}
+.nx-agents-pill{font-size:3.5px;padding:1px 4px;border-radius:2px;background:var(--sf2);color:var(--t2)}
+.nx-agents-pill .ct{color:var(--g);font-weight:600}
+.nx-inbox-btn{font-size:3.5px;padding:2px 5px;border-radius:3px;background:var(--ac);color:#fff;font-weight:600;border:none}
+
+/* Tabs */
+.nx-tabs{display:flex;border-bottom:1px solid var(--b1);background:var(--bg2)}
+.nx-tab{padding:3px 6px;font-size:3.5px;color:var(--t2);border-bottom:1px solid transparent}
+.nx-tab.active{color:var(--ac2);border-bottom-color:var(--ac)}
+
+/* Main content */
+.nx-main{position:absolute;top:0;right:0;bottom:0;display:flex;flex-direction:column}
+
+/* Service cards */
+.nx-svc-grid{display:grid;gap:4px;padding:4px}
+.nx-svc{padding:4px;border-radius:4px;background:var(--sf);border:1px solid var(--b1);position:relative;overflow:hidden}
+.nx-svc::before{content:'';position:absolute;top:0;left:0;right:0;height:1px}
+.nx-svc.healthy::before{background:var(--g)}
+.nx-svc.canary::before{background:linear-gradient(90deg,var(--y),var(--o))}
+.nx-svc-name{font-size:4.5px;font-weight:600;margin-bottom:1px}
+.nx-svc-ver{font-size:3px;color:var(--t2)}
+.nx-svc-metrics{display:flex;gap:2px;margin-top:2px}
+.nx-metric{flex:1;background:var(--bg2);border-radius:2px;padding:2px;text-align:center}
+.nx-metric-val{font-size:5px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.nx-metric-val.good{color:var(--g)}
+.nx-metric-label{font-size:2.5px;color:var(--t3)}
+.nx-spark{width:100%;height:8px;background:var(--bg2);border-radius:2px;margin-top:2px;overflow:hidden;position:relative}
+.nx-spark svg{width:100%;height:100%}
+.nx-canary-bar{height:2px;background:var(--bg);border-radius:1px;overflow:hidden;margin-top:2px}
+.nx-canary-fill{height:100%;border-radius:1px;background:linear-gradient(90deg,var(--y),var(--o));background-size:200% 100%;animation:cp 2s linear infinite}
+@keyframes cp{0%{background-position:0% 0}100%{background-position:200% 0}}
+.nx-canary-stages{display:flex;justify-content:space-between;font-size:2.5px;color:var(--t3);margin-top:1px}
+.nx-canary-stages .on{color:var(--y);font-weight:600}
+.nx-canary-stages .past{color:var(--g)}
+.nx-badge{display:inline-block;padding:1px 3px;border-radius:2px;font-size:3px;font-weight:600}
+
+/* Agent grid */
+.nx-agent-grid{display:grid;gap:3px;padding:4px}
+.nx-agent{padding:3px;border-radius:3px;background:var(--sf);border:1px solid var(--b1)}
+.nx-agent-name{font-size:4px;font-weight:600}
+.nx-agent-status{font-size:3px;color:var(--t2)}
+.nx-stream{height:1px;border-radius:0.5px;background:linear-gradient(90deg,transparent,var(--ac),var(--ac2),transparent);background-size:200% 100%;animation:s 2s linear infinite;margin-top:2px}
+@keyframes s{0%{background-position:-200% 0}100%{background-position:200% 0}}
+
+/* Deploy box */
+.nx-deploy{padding:4px;border-radius:4px;background:var(--sf);border:1px solid var(--b1)}
+.nx-deploy-title{font-size:4.5px;font-weight:600;margin-bottom:2px}
+.nx-deploy-btns{display:flex;gap:2px;margin-top:2px}
+.nx-deploy-btn{flex:1;padding:2px;border-radius:2px;font-size:3px;font-weight:600;text-align:center;border:1px solid var(--b1);background:var(--sf2);color:var(--t1)}
+.nx-deploy-btn.primary{background:var(--g);border-color:var(--g);color:#000}
+.nx-deploy-btn.danger{background:rgba(239,68,68,0.08);color:var(--r)}
+
+/* Locks */
+.nx-locks{padding:4px}
+.nx-lock{display:flex;align-items:center;gap:3px;padding:2px 3px;border-radius:2px;background:var(--bg2);font-size:3.5px;margin-bottom:2px}
+.nx-lock-path{font-family:'JetBrains Mono',monospace;flex:1}
+.nx-lock-type{font-size:2.5px;font-weight:600;padding:0 2px;border-radius:1px}
+
+/* Timeline */
+.nx-timeline{padding:4px}
+.nx-tl{display:flex;gap:3px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03);font-size:3.5px}
+.nx-tl-time{font-size:3px;color:var(--t3);font-family:'JetBrains Mono',monospace;min-width:12px}
+.nx-tl-body{flex:1}
+.nx-tl-body strong{font-weight:600}
+.nx-tl-btns{display:flex;gap:2px;margin-top:2px}
+.nx-tl-btn{padding:1.5px 4px;border-radius:2px;font-size:3px;background:var(--sf2);border:1px solid var(--b1);color:var(--t1)}
+.nx-tl-btn.primary{background:var(--ac);border-color:var(--ac)}
+
+/* OTEL */
+.nx-otel{padding:4px}
+.nx-otel-card{padding:4px;border-radius:4px;background:var(--sf);border:1px solid var(--b1);margin-bottom:3px}
+.nx-otel-title{font-size:4px;font-weight:600;margin-bottom:1px}
+.nx-otel-sub{font-size:3px;color:var(--t2);margin-bottom:2px}
+.nx-otel-chart{width:100%;height:20px;background:var(--bg2);border-radius:2px;overflow:hidden;position:relative}
+.nx-otel-chart svg{width:100%;height:100%}
+.nx-otel-mark{position:absolute;top:0;bottom:0;width:1px;background:var(--y);opacity:.4}
+.nx-otel-legend{display:flex;gap:6px;font-size:2.5px;color:var(--t2);margin-top:2px}
+.nx-otel-ldot{display:inline-block;width:3px;height:3px;border-radius:50%;margin-right:1px}
+
+/* Traces */
+.nx-trace{display:flex;align-items:center;gap:3px;padding:2px 0;font-size:3.5px;border-bottom:1px solid rgba(255,255,255,0.03)}
+.nx-trace-name{flex:1;font-family:'JetBrains Mono',monospace}
+.nx-trace-bar{width:40px;height:3px;background:var(--bg);border-radius:1.5px;overflow:hidden;position:relative}
+.nx-trace-fill{height:100%;border-radius:1.5px;position:absolute;top:0}
+.nx-trace-dur{min-width:14px;text-align:right;color:var(--t2);font-family:'JetBrains Mono',monospace}
+
+/* Diff viewer */
+.nx-diff{padding:4px;font-family:'JetBrains Mono',monospace;font-size:3.5px;line-height:1.7}
+.nx-diff-header{display:flex;justify-content:space-between;margin-bottom:3px}
+.nx-diff-file{font-weight:600;font-size:4px}
+.nx-diff-meta{font-size:3px;color:var(--t2)}
+.nx-code-line{display:flex}
+.nx-code-ln{min-width:10px;text-align:right;padding-right:3px;color:var(--t3);user-select:none}
+.nx-code-text{flex:1;white-space:pre}
+.nx-code-add{background:rgba(34,197,94,0.05)}.nx-code-add .nx-code-text{color:var(--g2)}
+.nx-code-del{background:rgba(239,68,68,0.05)}.nx-code-del .nx-code-text{color:var(--r2)}
+.nx-code-tag{float:right;font-size:2.5px;color:var(--t3);background:var(--bg2);padding:0 2px;border-radius:1px}
+
+/* Objectives */
+.nx-obj-cols{display:grid;gap:4px;padding:4px}
+.nx-obj-col-title{font-size:3px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;padding-bottom:2px;border-bottom:1px solid var(--b1);margin-bottom:3px}
+.nx-obj-card{padding:4px;border-radius:4px;background:var(--sf);border:1px solid var(--b1);margin-bottom:3px}
+.nx-obj-title{font-size:4.5px;font-weight:600;margin-bottom:1px}
+.nx-obj-meta{font-size:3px;color:var(--t2);margin-bottom:2px}
+.nx-obj-bar{height:2px;background:var(--bg);border-radius:1px;overflow:hidden}
+.nx-obj-fill{height:100%;border-radius:1px}
+.nx-obj-child{display:flex;align-items:center;gap:2px;font-size:3px;color:var(--t2);padding:1px 0}
+.nx-obj-child-dot{width:3px;height:3px;border-radius:50%;flex-shrink:0}
+
+/* Inbox cards */
+.nx-inbox{padding:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%}
+.nx-inbox-stack{position:relative;width:80%}
+.nx-inbox-bg{position:absolute;width:100%;border-radius:6px;background:var(--sf2);border:1px solid var(--b1)}
+.nx-inbox-bg:nth-child(1){height:50px;top:6px;transform:scale(.94);opacity:.3}
+.nx-inbox-bg:nth-child(2){height:50px;top:3px;transform:scale(.97);opacity:.5}
+.nx-inbox-front{position:relative;border-radius:6px;padding:6px;background:var(--sf);border:1px solid var(--b2);box-shadow:0 4px 16px rgba(0,0,0,0.4)}
+.nx-inbox-type{display:inline-block;padding:1px 3px;border-radius:2px;font-size:3px;font-weight:600;margin-bottom:3px}
+.nx-inbox-type.deploy{background:rgba(234,179,8,0.1);color:var(--y)}
+.nx-inbox-type.arch{background:rgba(168,85,247,0.1);color:var(--p)}
+.nx-inbox-src{font-size:3px;color:var(--t2);margin-bottom:2px}
+.nx-inbox-q{font-size:5px;font-weight:500;line-height:1.4;margin-bottom:3px}
+.nx-inbox-evidence{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-bottom:3px}
+.nx-inbox-ev{padding:2px;border-radius:2px;background:var(--bg2);text-align:center}
+.nx-inbox-ev-val{font-size:5px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.nx-inbox-ev-label{font-size:2px;color:var(--t3)}
+.nx-inbox-btns{display:flex;gap:2px}
+.nx-inbox-btn{flex:1;padding:3px;border-radius:3px;font-size:3.5px;font-weight:600;text-align:center;border:none}
+.nx-inbox-btn.left{background:rgba(239,68,68,0.1);color:var(--r)}
+.nx-inbox-btn.right{background:rgba(34,197,94,0.1);color:var(--g)}
+
+/* Section label inside screens */
+.nx-sec-title{font-size:3px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;padding:2px 4px}
+
+/* Artifacts */
+.nx-art-grid{display:grid;gap:2px;padding:0 4px}
+.nx-art{padding:2px 3px;border-radius:2px;background:var(--sf);border:1px solid var(--b1);font-size:3.5px}
+.nx-art-name{font-weight:600;font-family:'JetBrains Mono',monospace}
+.nx-art-detail{font-size:3px;color:var(--ac2)}
+
+/* ═══════════════════════════════════ */
+/* LAYOUT-SPECIFIC                     */
+/* ═══════════════════════════════════ */
+
+/* 1-screen */
+.desk-1{width:800px}
+.desk-1 .monitor{width:800px;height:500px}
+
+/* 2-screen */
+.desk-2{width:1200px;display:flex;gap:12px;align-items:flex-end}
+.desk-2 .monitor.primary{width:700px;height:440px}
+.desk-2 .monitor.secondary{width:480px;height:440px}
+
+/* 3-screen */
+.desk-3{width:1400px;display:flex;gap:10px;align-items:flex-end}
+.desk-3 .monitor.left{width:420px;height:380px}
+.desk-3 .monitor.center{width:540px;height:420px}
+.desk-3 .monitor.right{width:380px;height:520px}
+
+/* 6-screen */
+.desk-6{width:1400px;display:grid;grid-template-columns:1fr 1.3fr 1fr;grid-template-rows:1fr 1fr;gap:10px}
+.desk-6 .monitor{height:260px}
+
+/* Annotations */
+.anno{position:absolute;font-size:10px;color:var(--t3);font-weight:500;pointer-events:none}
+.anno-line{position:absolute;border:1px dashed rgba(99,102,241,0.2);pointer-events:none}
+
+/* Screen label */
+.screen-label{
+  position:absolute;bottom:4px;right:4px;
+  font-size:8px;font-weight:700;color:rgba(99,102,241,0.3);
+  letter-spacing:1px;text-transform:uppercase;z-index:5;
+  font-family:'JetBrains Mono',monospace;
+}
+</style>
+</head>
+<body>
+
+<div class="config-bar">
+  <div class="config-title">NEXUS Screens</div>
+  <button class="config-btn active" onclick="showLayout('1')">1 Screen</button>
+  <button class="config-btn" onclick="showLayout('2')">2 Screens</button>
+  <button class="config-btn" onclick="showLayout('3')">3 Screens</button>
+  <button class="config-btn" onclick="showLayout('6')">6 Screens</button>
+  <div class="config-sub">Minority Report mode</div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- 1 SCREEN — Full cockpit                     -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="layout-1" class="layout-view active">
+  <div class="layout-label">
+    <h2>Single Screen — The Cockpit</h2>
+    <p>Everything in one window. Sidebar + System Map with tabs.</p>
+  </div>
+  <div class="desk desk-1">
+    <div class="monitor">
+      <div class="screen-content" id="sc-1-cockpit"></div>
+      <div class="screen-label">cockpit</div>
+    </div>
+    <div class="monitor-stand"></div>
+    <div class="monitor-base"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- 2 SCREENS — Cockpit + Timeline/Diff         -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="layout-2" class="layout-view">
+  <div class="layout-label">
+    <h2>Dual Screen — Cockpit + Depth</h2>
+    <p>Center: command & awareness. Side: live timeline, diffs, decisions.</p>
+  </div>
+  <div class="desk desk-2">
+    <div class="monitor primary">
+      <div class="screen-content" id="sc-2-cockpit"></div>
+      <div class="screen-label">cockpit</div>
+    </div>
+    <div class="monitor secondary">
+      <div class="screen-content" id="sc-2-depth"></div>
+      <div class="screen-label">depth</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- 3 SCREENS — Full spread                      -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="layout-3" class="layout-view">
+  <div class="layout-label">
+    <h2>Triple Screen — Command Center</h2>
+    <p>Left: decisions + diff. Center: cockpit. Right (vertical): timeline + OTEL feed.</p>
+  </div>
+  <div class="desk desk-3">
+    <div class="monitor left">
+      <div class="screen-content" id="sc-3-left"></div>
+      <div class="screen-label">decisions</div>
+    </div>
+    <div class="monitor center">
+      <div class="screen-content" id="sc-3-center"></div>
+      <div class="screen-label">cockpit</div>
+    </div>
+    <div class="monitor right">
+      <div class="screen-content" id="sc-3-right"></div>
+      <div class="screen-label">feed</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- 6 SCREENS — Minority Report                  -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="layout-6" class="layout-view">
+  <div class="layout-label">
+    <h2>Six Screens — Minority Report</h2>
+    <p>Every panel gets its own display. Total ambient awareness.</p>
+  </div>
+  <div class="desk desk-6">
+    <div class="monitor">
+      <div class="screen-content" id="sc-6-decisions"></div>
+      <div class="screen-label">decisions</div>
+    </div>
+    <div class="monitor">
+      <div class="screen-content" id="sc-6-system"></div>
+      <div class="screen-label">system map</div>
+    </div>
+    <div class="monitor">
+      <div class="screen-content" id="sc-6-objectives"></div>
+      <div class="screen-label">objectives</div>
+    </div>
+    <div class="monitor">
+      <div class="screen-content" id="sc-6-timeline"></div>
+      <div class="screen-label">timeline</div>
+    </div>
+    <div class="monitor">
+      <div class="screen-content" id="sc-6-otel"></div>
+      <div class="screen-label">otel</div>
+    </div>
+    <div class="monitor">
+      <div class="screen-content" id="sc-6-diff"></div>
+      <div class="screen-label">live diff</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Layout switching ──
+function showLayout(n) {
+  document.querySelectorAll('.layout-view').forEach(v => v.classList.remove('active'));
+  document.getElementById('layout-' + n).classList.add('active');
+  document.querySelectorAll('.config-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+// ── Content builders ──
+function sidebar(w) {
+  return `
+  <div class="nx-sidebar" style="width:${w}px">
+    <div class="nx-logo"><div class="nx-logo-icon">N</div><span class="nx-logo-text">NEXUS</span></div>
+    <div class="nx-pulse"><div class="nx-pulse-dot"></div><div class="nx-pulse-text">All nominal</div></div>
+    <div class="nx-nav">
+      <div class="nx-nav-sec">Navigate</div>
+      <div class="nx-nav-item active"><span class="dot" style="background:var(--ac)"></span>System Map</div>
+      <div class="nx-nav-item"><span class="dot" style="background:var(--t3)"></span>Objectives<span class="nx-nav-badge warn">2</span></div>
+      <div class="nx-nav-item"><span class="dot" style="background:var(--t3)"></span>Observability</div>
+      <div class="nx-nav-sec" style="margin-top:4px">Projects</div>
+      <div class="nx-nav-item"><span class="dot" style="background:var(--ac)"></span>Payments Rewrite<span class="nx-nav-badge alert">2</span></div>
+      <div class="nx-nav-tree">
+        <div class="nx-nav-item" style="font-weight:600;color:var(--t1)">Stripe v3<span class="nx-nav-badge info">5</span></div>
+        <div class="nx-nav-item">Webhooks<span class="nx-nav-badge warn">⚠</span></div>
+        <div class="nx-nav-item" style="color:var(--g)">DB migration ✓</div>
+        <div class="nx-nav-item">Tests<span class="nx-nav-badge info">3/8</span></div>
+      </div>
+      <div class="nx-nav-item"><span class="dot" style="background:var(--g)"></span>Mobile v3</div>
+      <div class="nx-nav-item"><span class="dot" style="background:var(--o)"></span>Infra<span class="nx-nav-badge alert">1</span></div>
+      <div class="nx-nav-sec" style="margin-top:4px">Locks</div>
+      <div class="nx-nav-item" style="font-size:3px">🔒 billing/** <span style="color:var(--t3)">Stripe</span></div>
+      <div class="nx-nav-item" style="font-size:3px">⏳ billing/** <span style="color:var(--y)">Pricing (q)</span></div>
+    </div>
+  </div>`;
+}
+
+function topbar() {
+  return `
+  <div class="nx-topbar">
+    <div class="nx-crumb">System › <strong>Overview</strong></div>
+    <div class="nx-topbar-right">
+      <div class="nx-agents-pill"><span class="ct">14</span> agents · <span class="ct" style="color:var(--y)">3</span> waiting</div>
+      <button class="nx-inbox-btn">7 decisions</button>
+    </div>
+  </div>`;
+}
+
+function systemMap() {
+  return `
+  ${topbar()}
+  <div class="nx-tabs">
+    <div class="nx-tab active">System Map</div>
+    <div class="nx-tab">Objectives</div>
+    <div class="nx-tab">Focus</div>
+    <div class="nx-tab">OTEL</div>
+  </div>
+  <div style="flex:1;overflow-y:auto">
+    <div class="nx-svc-grid" style="grid-template-columns:1fr 1fr">
+      <div class="nx-svc canary">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div><div class="nx-svc-name">api-gateway</div><div class="nx-svc-ver">v2.34.1 → v2.35.0</div></div>
+          <div class="nx-badge" style="background:rgba(234,179,8,0.1);color:var(--y)">canary 5%</div>
+        </div>
+        <div class="nx-svc-metrics">
+          <div class="nx-metric"><div class="nx-metric-val good">31ms</div><div class="nx-metric-label">p99</div></div>
+          <div class="nx-metric"><div class="nx-metric-val good">0.01%</div><div class="nx-metric-label">errors</div></div>
+          <div class="nx-metric"><div class="nx-metric-val">2.4k</div><div class="nx-metric-label">rps</div></div>
+        </div>
+        <div class="nx-spark"><svg viewBox="0 0 200 8" preserveAspectRatio="none"><path d="M0,4 C30,3 60,5 90,4 C120,3 140,2 160,3 C180,4 200,3 200,3" stroke="var(--g)" stroke-width="0.5" fill="none"/></svg></div>
+        <div class="nx-canary-bar"><div class="nx-canary-fill" style="width:85%"></div></div>
+        <div class="nx-canary-stages"><span class="past">5% ✓</span><span class="on">→ 25%</span><span>50%</span><span>100%</span></div>
+      </div>
+      <div class="nx-svc healthy">
+        <div style="display:flex;justify-content:space-between"><div><div class="nx-svc-name">payment-service</div><div class="nx-svc-ver">v3.12.0</div></div><div class="nx-badge" style="background:rgba(34,197,94,0.1);color:var(--g)">healthy</div></div>
+        <div class="nx-svc-metrics">
+          <div class="nx-metric"><div class="nx-metric-val good">18ms</div><div class="nx-metric-label">p99</div></div>
+          <div class="nx-metric"><div class="nx-metric-val good">0.00%</div><div class="nx-metric-label">errors</div></div>
+          <div class="nx-metric"><div class="nx-metric-val good">99.4%</div><div class="nx-metric-label">success</div></div>
+        </div>
+      </div>
+      <div class="nx-svc healthy">
+        <div><div class="nx-svc-name">postgres-primary</div><div class="nx-svc-ver">16.2 · us-east-1</div></div>
+        <div class="nx-svc-metrics">
+          <div class="nx-metric"><div class="nx-metric-val good">4ms</div><div class="nx-metric-label">query p99</div></div>
+          <div class="nx-metric"><div class="nx-metric-val">84</div><div class="nx-metric-label">conns</div></div>
+          <div class="nx-metric"><div class="nx-metric-val good">0.2s</div><div class="nx-metric-label">repl lag</div></div>
+        </div>
+      </div>
+      <div class="nx-svc healthy">
+        <div><div class="nx-svc-name">event-queue</div><div class="nx-svc-ver">RabbitMQ 3.13</div></div>
+        <div class="nx-svc-metrics">
+          <div class="nx-metric"><div class="nx-metric-val">342</div><div class="nx-metric-label">depth</div></div>
+          <div class="nx-metric"><div class="nx-metric-val">1.2k</div><div class="nx-metric-label">msg/s</div></div>
+          <div class="nx-metric"><div class="nx-metric-val good">8</div><div class="nx-metric-label">consumers</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="nx-sec-title" style="margin-top:2px">Agents — Stripe v3</div>
+    <div class="nx-agent-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="nx-agent"><div class="nx-agent-name" style="color:var(--g)">architect</div><div class="nx-agent-status">✓ done</div></div>
+      <div class="nx-agent" style="border-color:rgba(99,102,241,0.3)"><div class="nx-agent-name">coder-api</div><div class="nx-agent-status">editing pay.js</div><div class="nx-stream"></div></div>
+      <div class="nx-agent"><div class="nx-agent-name">coder-ui</div><div class="nx-agent-status">checkout form</div><div class="nx-stream"></div></div>
+    </div>
+    <div class="nx-agent-grid" style="grid-template-columns:1fr 1fr;margin-top:0">
+      <div class="nx-agent" style="border-color:rgba(234,179,8,0.2)"><div class="nx-agent-name">tester</div><div class="nx-agent-status" style="color:var(--y)">⚠ 3/8</div></div>
+      <div class="nx-agent" style="border-color:rgba(34,197,94,0.2)"><div class="nx-agent-name">deployer</div><div class="nx-agent-status" style="color:var(--g)">watching</div></div>
+    </div>
+    <div class="nx-sec-title">Scope & Locks</div>
+    <div class="nx-locks">
+      <div class="nx-lock"><span class="nx-lock-path">billing/**</span><span class="nx-lock-type" style="background:rgba(239,68,68,0.08);color:var(--r)">EXCL</span><span style="font-size:2.5px;color:var(--y)">Pricing queued</span></div>
+      <div class="nx-lock"><span class="nx-lock-path">api/payments/**</span><span class="nx-lock-type" style="background:rgba(99,102,241,0.08);color:var(--ac2)">SHARED</span></div>
+      <div class="nx-lock"><span class="nx-lock-path">db/migrations/**</span><span class="nx-lock-type" style="background:rgba(239,68,68,0.08);color:var(--r)">EXCL</span></div>
+    </div>
+  </div>`;
+}
+
+function timeline() {
+  return `
+  <div style="padding:6px 6px 3px;border-bottom:1px solid var(--b1)">
+    <div style="font-size:6px;font-weight:700;margin-bottom:1px">Timeline</div>
+    <div style="font-size:3.5px;color:var(--t2)">Stripe v3 · live</div>
+  </div>
+  <div class="nx-timeline" style="flex:1;overflow-y:auto">
+    <div class="nx-tl"><div class="nx-tl-time">14:12</div><div class="nx-tl-body"><strong style="color:var(--g)">deployer</strong> — Canary stable 15min. Promote?<div class="nx-tl-btns"><button class="nx-tl-btn primary">Promote</button><button class="nx-tl-btn">Hold</button><button class="nx-tl-btn" style="color:var(--r)">Rollback</button></div></div></div>
+    <div class="nx-tl"><div class="nx-tl-time">14:07</div><div class="nx-tl-body"><strong style="color:var(--ac2)">coder-api</strong> — Return paymentIntent ID or compat?<div class="nx-tl-btns"><button class="nx-tl-btn primary">New ID</button><button class="nx-tl-btn">Compat</button></div></div></div>
+    <div class="nx-tl"><div class="nx-tl-time">14:05</div><div class="nx-tl-body"><strong style="color:var(--r)">tester</strong> — currency conversion failed at pay.js:42</div></div>
+    <div class="nx-tl"><div class="nx-tl-time">14:03</div><div class="nx-tl-body"><strong style="color:var(--ac2)">coder-api</strong> — charges.create → paymentIntents.create</div></div>
+    <div class="nx-tl"><div class="nx-tl-time">14:00</div><div class="nx-tl-body"><strong style="color:var(--g)">deployer</strong> — canary 5% deployed us-east-1</div></div>
+    <div class="nx-tl"><div class="nx-tl-time">13:55</div><div class="nx-tl-body"><strong style="color:var(--ac2)">coder-api</strong> — write lock on api/payments/** <span style="color:var(--g)">granted</span></div></div>
+    <div class="nx-tl"><div class="nx-tl-time">13:50</div><div class="nx-tl-body"><strong style="color:var(--p)">lock-mgr</strong> — Pricing redesign queued for billing/**</div></div>
+    <div class="nx-tl"><div class="nx-tl-time">13:30</div><div class="nx-tl-body"><strong>system</strong> — Objective started. 5 agents. Scope locked.</div></div>
+    <div class="nx-tl"><div class="nx-tl-time">13:20</div><div class="nx-tl-body"><strong style="color:var(--p)">architect</strong> — Schema design complete. Starting agents.</div></div>
+    <div class="nx-tl"><div class="nx-tl-time">13:15</div><div class="nx-tl-body"><strong>system</strong> — Signal: GitHub issue #234 "Migrate Stripe v3"</div></div>
+  </div>`;
+}
+
+function diffViewer() {
+  return `
+  <div style="padding:6px;border-bottom:1px solid var(--b1)">
+    <div style="font-size:6px;font-weight:700;margin-bottom:1px">Live Diff</div>
+    <div style="font-size:3.5px;color:var(--t2)">routes/pay.js · coder-api · 14:06</div>
+  </div>
+  <div class="nx-diff">
+    <div class="nx-code-line"><span class="nx-code-ln">38</span><span class="nx-code-text">  const stripe = new Stripe(key);</span></div>
+    <div class="nx-code-line"><span class="nx-code-ln">39</span><span class="nx-code-text"></span></div>
+    <div class="nx-code-line nx-code-del"><span class="nx-code-ln">40</span><span class="nx-code-text">  const charge = await stripe.charges.create({</span></div>
+    <div class="nx-code-line nx-code-del"><span class="nx-code-ln">41</span><span class="nx-code-text">    amount,</span></div>
+    <div class="nx-code-line nx-code-del"><span class="nx-code-ln">42</span><span class="nx-code-text">    currency,</span></div>
+    <div class="nx-code-line nx-code-del"><span class="nx-code-ln">43</span><span class="nx-code-text">    source: req.body.token,</span></div>
+    <div class="nx-code-line nx-code-del"><span class="nx-code-ln">44</span><span class="nx-code-text">  });</span></div>
+    <div class="nx-code-line"><span class="nx-code-ln"></span><span class="nx-code-text"></span></div>
+    <div class="nx-code-line nx-code-add"><span class="nx-code-ln">40</span><span class="nx-code-text">  const intent = await stripe.paymentIntents.create({<span class="nx-code-tag">coder-api</span></span></div>
+    <div class="nx-code-line nx-code-add"><span class="nx-code-ln">41</span><span class="nx-code-text">    amount,</span></div>
+    <div class="nx-code-line nx-code-add"><span class="nx-code-ln">42</span><span class="nx-code-text">    currency,</span></div>
+    <div class="nx-code-line nx-code-add"><span class="nx-code-ln">43</span><span class="nx-code-text">    payment_method: req.body.paymentMethod,</span></div>
+    <div class="nx-code-line nx-code-add"><span class="nx-code-ln">44</span><span class="nx-code-text">    confirm: true,</span></div>
+    <div class="nx-code-line nx-code-add"><span class="nx-code-ln">45</span><span class="nx-code-text">    automatic_payment_methods: {</span></div>
+    <div class="nx-code-line nx-code-add"><span class="nx-code-ln">46</span><span class="nx-code-text">      enabled: true,</span></div>
+    <div class="nx-code-line nx-code-add"><span class="nx-code-ln">47</span><span class="nx-code-text">      allow_redirects: "never",</span></div>
+    <div class="nx-code-line nx-code-add"><span class="nx-code-ln">48</span><span class="nx-code-text">    },</span></div>
+    <div class="nx-code-line nx-code-add"><span class="nx-code-ln">49</span><span class="nx-code-text">  });</span></div>
+    <div class="nx-code-line"><span class="nx-code-ln">50</span><span class="nx-code-text"></span></div>
+    <div class="nx-code-line"><span class="nx-code-ln">51</span><span class="nx-code-text">  res.json({</span></div>
+    <div class="nx-code-line nx-code-del"><span class="nx-code-ln">52</span><span class="nx-code-text">    id: charge.id,</span></div>
+    <div class="nx-code-line nx-code-add"><span class="nx-code-ln">52</span><span class="nx-code-text">    id: intent.id,<span class="nx-code-tag">coder-api</span></span></div>
+    <div class="nx-code-line nx-code-add"><span class="nx-code-ln">53</span><span class="nx-code-text">    status: intent.status,</span></div>
+    <div class="nx-code-line nx-code-add"><span class="nx-code-ln">54</span><span class="nx-code-text">    clientSecret: intent.client_secret,</span></div>
+    <div class="nx-code-line"><span class="nx-code-ln">55</span><span class="nx-code-text">  });</span></div>
+  </div>
+  <div class="nx-sec-title" style="margin-top:4px">Artifacts — 6 files changed</div>
+  <div class="nx-art-grid" style="grid-template-columns:1fr 1fr">
+    <div class="nx-art"><div class="nx-art-name">routes/pay.js</div><div class="nx-art-detail">+84 -31</div></div>
+    <div class="nx-art"><div class="nx-art-name">billing/intent.js</div><div class="nx-art-detail">new +120</div></div>
+    <div class="nx-art"><div class="nx-art-name">checkout.tsx</div><div class="nx-art-detail">+45</div></div>
+    <div class="nx-art"><div class="nx-art-name">stripe-client.js</div><div class="nx-art-detail">+62</div></div>
+    <div class="nx-art"><div class="nx-art-name">migration_012</div><div class="nx-art-detail" style="color:var(--g)">✓ applied</div></div>
+    <div class="nx-art"><div class="nx-art-name">pay.test.js</div><div class="nx-art-detail">3/8</div></div>
+  </div>`;
+}
+
+function decisions() {
+  return `
+  <div style="padding:6px 6px 3px;border-bottom:1px solid var(--b1)">
+    <div style="font-size:6px;font-weight:700;margin-bottom:1px">Decisions</div>
+    <div style="font-size:3.5px;color:var(--t2)">7 waiting</div>
+  </div>
+  <div class="nx-inbox">
+    <div class="nx-inbox-stack">
+      <div class="nx-inbox-bg"></div>
+      <div class="nx-inbox-bg"></div>
+      <div class="nx-inbox-front">
+        <div class="nx-inbox-type deploy">⚡ DEPLOY GATE</div>
+        <div class="nx-inbox-src">Payments › Stripe v3 › deployer</div>
+        <div class="nx-inbox-q">Canary at 5% for 15 minutes. All metrics green. Promote to 25%?</div>
+        <div class="nx-inbox-evidence">
+          <div class="nx-inbox-ev"><div class="nx-inbox-ev-val" style="color:var(--g)">31ms</div><div class="nx-inbox-ev-label">p99</div></div>
+          <div class="nx-inbox-ev"><div class="nx-inbox-ev-val" style="color:var(--g)">0.01%</div><div class="nx-inbox-ev-label">errors</div></div>
+          <div class="nx-inbox-ev"><div class="nx-inbox-ev-val" style="color:var(--g)">99.3%</div><div class="nx-inbox-ev-label">success</div></div>
+        </div>
+        <div class="nx-inbox-btns">
+          <div class="nx-inbox-btn left">Hold</div>
+          <div class="nx-inbox-btn right">Promote →</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function otelPanel() {
+  return `
+  <div style="padding:6px 6px 3px;border-bottom:1px solid var(--b1)">
+    <div style="font-size:6px;font-weight:700;margin-bottom:1px">Observability</div>
+    <div style="font-size:3.5px;color:var(--t2)">All services · last 6h</div>
+  </div>
+  <div class="nx-otel" style="flex:1;overflow-y:auto">
+    <div class="nx-otel-card">
+      <div class="nx-otel-title">API Gateway — Latency</div>
+      <div class="nx-otel-sub">p50 / p95 / p99</div>
+      <div class="nx-otel-chart">
+        <svg viewBox="0 0 200 20" preserveAspectRatio="none">
+          <path d="M0,12 C30,11 60,13 90,12 C120,10 140,7 160,8 C180,9 200,8 200,8" stroke="var(--y)" stroke-width="0.7" fill="none"/>
+          <path d="M0,15 C30,14 60,16 90,15 C120,13 140,10 160,11 C180,12 200,11 200,11" stroke="var(--ac)" stroke-width="0.5" fill="none"/>
+          <path d="M0,17 C30,16 60,18 90,17 C120,16 140,14 160,15 C180,16 200,15 200,15" stroke="var(--g)" stroke-width="0.3" fill="none" opacity=".5"/>
+        </svg>
+        <div class="nx-otel-mark" style="left:65%"></div>
+      </div>
+      <div class="nx-otel-legend"><span><span class="nx-otel-ldot" style="background:var(--y)"></span>p99</span><span><span class="nx-otel-ldot" style="background:var(--ac)"></span>p95</span><span><span class="nx-otel-ldot" style="background:var(--g)"></span>p50</span></div>
+    </div>
+    <div class="nx-otel-card">
+      <div class="nx-otel-title">Error Rate</div>
+      <div class="nx-otel-sub">all services</div>
+      <div class="nx-otel-chart">
+        <svg viewBox="0 0 200 20" preserveAspectRatio="none">
+          <path d="M0,17 C50,17 100,17 140,17 C160,16 170,15 180,16 C190,17 200,17 200,17" stroke="var(--g)" stroke-width="0.5" fill="none"/>
+        </svg>
+        <div class="nx-otel-mark" style="left:65%"></div>
+      </div>
+      <div class="nx-otel-legend"><span><span class="nx-otel-ldot" style="background:var(--g)"></span>api-gw 0.01%</span><span><span class="nx-otel-ldot" style="background:var(--ac)"></span>pay-svc 0.00%</span></div>
+    </div>
+    <div style="padding:4px;font-size:4px;font-weight:600;margin-bottom:2px">Recent Traces — Canary</div>
+    <div style="padding:0 4px">
+      <div class="nx-trace"><div class="nx-trace-name">POST /api/pay</div><div class="nx-trace-bar"><div class="nx-trace-fill" style="left:0;width:100%;background:var(--g);opacity:.5"></div></div><div class="nx-trace-dur">31ms</div></div>
+      <div class="nx-trace" style="padding-left:6px"><div class="nx-trace-name" style="color:var(--t2)">→ stripe.paymentIntents</div><div class="nx-trace-bar"><div class="nx-trace-fill" style="left:10%;width:75%;background:var(--ac);opacity:.4"></div></div><div class="nx-trace-dur">23ms</div></div>
+      <div class="nx-trace" style="padding-left:6px"><div class="nx-trace-name" style="color:var(--t2)">→ db.insert</div><div class="nx-trace-bar"><div class="nx-trace-fill" style="left:85%;width:12%;background:var(--c);opacity:.4"></div></div><div class="nx-trace-dur">4ms</div></div>
+      <div class="nx-trace"><div class="nx-trace-name">POST /api/webhook</div><div class="nx-trace-bar"><div class="nx-trace-fill" style="left:0;width:58%;background:var(--g);opacity:.5"></div></div><div class="nx-trace-dur">18ms</div></div>
+      <div class="nx-trace" style="padding-left:6px"><div class="nx-trace-name" style="color:var(--t2)">→ verify_sig</div><div class="nx-trace-bar"><div class="nx-trace-fill" style="left:5%;width:15%;background:var(--ac);opacity:.4"></div></div><div class="nx-trace-dur">3ms</div></div>
+    </div>
+  </div>`;
+}
+
+function objectives() {
+  return `
+  <div style="padding:6px 6px 3px;border-bottom:1px solid var(--b1)">
+    <div style="font-size:6px;font-weight:700;margin-bottom:1px">Objectives</div>
+    <div style="font-size:3.5px;color:var(--t2)">Payments Rewrite</div>
+  </div>
+  <div class="nx-obj-cols" style="grid-template-columns:1.2fr 1fr .8fr;flex:1;overflow-y:auto;align-content:start">
+    <div>
+      <div class="nx-obj-col-title">In progress (3)</div>
+      <div class="nx-obj-card">
+        <div style="display:flex;justify-content:space-between"><div class="nx-obj-title">Stripe v3</div><div class="nx-badge" style="background:rgba(234,179,8,0.1);color:var(--y)">canary</div></div>
+        <div class="nx-obj-meta">5 agents · 3 repos</div>
+        <div class="nx-obj-bar"><div class="nx-obj-fill" style="width:60%;background:linear-gradient(90deg,var(--ac),var(--ac2))"></div></div>
+        <div style="margin-top:2px">
+          <div class="nx-obj-child"><div class="nx-obj-child-dot" style="background:var(--g)"></div>API endpoints ✓✓●○</div>
+          <div class="nx-obj-child"><div class="nx-obj-child-dot" style="background:var(--y)"></div>Webhooks ⚠</div>
+          <div class="nx-obj-child"><div class="nx-obj-child-dot" style="background:var(--g)"></div>DB migration ✓</div>
+          <div class="nx-obj-child"><div class="nx-obj-child-dot" style="background:var(--ac)"></div>Tests 3/8</div>
+        </div>
+      </div>
+      <div class="nx-obj-card">
+        <div class="nx-obj-title">Invoice PDF</div>
+        <div class="nx-obj-meta">2 agents</div>
+        <div class="nx-obj-bar"><div class="nx-obj-fill" style="width:35%;background:var(--ac)"></div></div>
+        <div class="nx-stream" style="margin-top:2px"></div>
+      </div>
+      <div class="nx-obj-card">
+        <div class="nx-obj-title">Auth v2</div>
+        <div class="nx-obj-meta">3 agents · testing</div>
+        <div class="nx-obj-bar"><div class="nx-obj-fill" style="width:80%;background:linear-gradient(90deg,var(--g),var(--ac))"></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="nx-obj-col-title">Blocked (2)</div>
+      <div class="nx-obj-card" style="border-color:rgba(234,179,8,0.15)">
+        <div class="nx-obj-title">Pricing redesign</div>
+        <div class="nx-obj-meta">1 agent</div>
+        <div style="font-size:3px;color:var(--y);margin-top:2px;padding:2px 3px;border-radius:2px;background:rgba(234,179,8,0.04)">⏳ billing/** locked</div>
+      </div>
+      <div class="nx-obj-card" style="border-color:rgba(239,68,68,0.15)">
+        <div class="nx-obj-title">Notifications</div>
+        <div class="nx-obj-meta">1 agent · errored</div>
+        <div style="font-size:3px;color:var(--r);margin-top:2px">SMTP connection refused</div>
+      </div>
+    </div>
+    <div>
+      <div class="nx-obj-col-title">Done today (3)</div>
+      <div class="nx-obj-card" style="opacity:.6"><div class="nx-obj-title" style="color:var(--g)">✓ Refund flow</div><div class="nx-obj-meta">11:30 · 45min canary</div></div>
+      <div class="nx-obj-card" style="opacity:.6"><div class="nx-obj-title" style="color:var(--g)">✓ Rate limiter</div><div class="nx-obj-meta">09:15 · 0 incidents</div></div>
+      <div class="nx-obj-card" style="opacity:.6"><div class="nx-obj-title" style="color:var(--g)">✓ Push notifs</div><div class="nx-obj-meta">08:40</div></div>
+    </div>
+  </div>`;
+}
+
+// ── Render layouts ──
+
+// 1 screen: full cockpit
+document.getElementById('sc-1-cockpit').innerHTML =
+  sidebar(65) +
+  `<div class="nx-main" style="left:65px">` + systemMap() + `</div>`;
+
+// 2 screens: cockpit + timeline/diff
+document.getElementById('sc-2-cockpit').innerHTML =
+  sidebar(55) +
+  `<div class="nx-main" style="left:55px">` + systemMap() + `</div>`;
+
+document.getElementById('sc-2-depth').innerHTML =
+  `<div style="display:flex;flex-direction:column;height:100%">
+    <div style="display:flex;height:55%;border-bottom:1px solid var(--b1)">
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">` + timeline() + `</div>
+    </div>
+    <div style="height:45%;overflow-y:auto">` + diffViewer() + `</div>
+  </div>`;
+
+// 3 screens: decisions + cockpit + feed (vertical)
+document.getElementById('sc-3-left').innerHTML =
+  `<div style="display:flex;flex-direction:column;height:100%">
+    <div style="height:55%;border-bottom:1px solid var(--b1)">` + decisions() + `</div>
+    <div style="height:45%;overflow-y:auto">` + diffViewer() + `</div>
+  </div>`;
+
+document.getElementById('sc-3-center').innerHTML =
+  sidebar(50) +
+  `<div class="nx-main" style="left:50px">` + systemMap() + `</div>`;
+
+document.getElementById('sc-3-right').innerHTML =
+  `<div style="display:flex;flex-direction:column;height:100%">
+    <div style="height:50%;border-bottom:1px solid var(--b1);display:flex;flex-direction:column;overflow:hidden">` + timeline() + `</div>
+    <div style="height:50%;display:flex;flex-direction:column;overflow:hidden">` + otelPanel() + `</div>
+  </div>`;
+
+// 6 screens: every panel gets its own display
+document.getElementById('sc-6-decisions').innerHTML = decisions();
+document.getElementById('sc-6-system').innerHTML =
+  sidebar(45) +
+  `<div class="nx-main" style="left:45px">` + systemMap() + `</div>`;
+document.getElementById('sc-6-objectives').innerHTML =
+  `<div style="display:flex;flex-direction:column;height:100%">` + objectives() + `</div>`;
+document.getElementById('sc-6-timeline').innerHTML =
+  `<div style="display:flex;flex-direction:column;height:100%">` + timeline() + `</div>`;
+document.getElementById('sc-6-otel').innerHTML =
+  `<div style="display:flex;flex-direction:column;height:100%">` + otelPanel() + `</div>`;
+document.getElementById('sc-6-diff').innerHTML =
+  `<div style="display:flex;flex-direction:column;height:100%;overflow-y:auto">` + diffViewer() + `</div>`;
+</script>
+</body>
+</html>

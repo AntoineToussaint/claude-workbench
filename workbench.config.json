@@ -1,16 +1,17 @@
 {
   "colors": ["blue", "green", "red", "yellow", "black", "purple", "orange", "cyan"],
   "port": 3232,
+  "multiplexer": "tmux",
   "launchers": [
     {
       "id": "ghostty",
       "label": "Ghostty",
       "icon": "terminal",
-      "type": "tmux-terminal",
+      "type": "mux-terminal",
       "app": "/Applications/Ghostty.app/Contents/MacOS/ghostty",
       "fullscreen": true,
       "panes": [
-        { "cmd": "claude --continue", "focus": true },
+        { "cmd": "claude", "focus": true },
         { "cmd": null }
       ]
     },

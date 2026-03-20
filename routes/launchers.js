@@ -99,11 +99,15 @@ router.post("/launch", async (req, res) => {
 });
 
 async function launchMuxTerminal(launcher, color, envPath, colorDef, title, res) {
-  const mux = await getMultiplexer();
+  const config = loadConfig();
+  const muxOverride = config.multiplexer ?? "auto";
+  const mux = await getMultiplexer(muxOverride);
   const muxType = mux.getType();
 
   if (muxType === "none") {
-    return res.json({ ok: true, skipped: true, reason: "no multiplexer available" });
+    // No multiplexer — launch terminal directly with claude
+    spawnDirectTerminal(launcher, color, envPath, colorDef, title);
+    return res.json({ ok: true });
   }
 
   const key = pidKey(launcher.id, color);
@@ -164,7 +168,6 @@ async function launchMuxTerminal(launcher, color, envPath, colorDef, title, res)
 
   // Create the session
   const panes = launcher.panes ?? [{ cmd: null }];
-  const config = loadConfig();
   const clipCmd = getClipboardCommand();
 
   await mux.createSession(session, envPath, panes, {
@@ -227,6 +230,42 @@ function spawnTerminalApp(launcher, session, color, colorDef, title, mux) {
   // Run post-spawn script if needed (e.g., iTerm2, Terminal.app)
   if (spawnArgs.postSpawnScript) {
     setTimeout(() => exec(spawnArgs.postSpawnScript), 500);
+  }
+}
+
+function spawnDirectTerminal(launcher, color, envPath, colorDef, title) {
+  const key = pidKey(launcher.id, color);
+
+  // If already alive, just focus
+  if (isAlive(key)) {
+    const pid = terminalPids[key];
+    const focusCmd = getWindowFocusCommand(pid);
+    if (focusCmd) exec(focusCmd);
+    return;
+  }
+
+  const platform = detectPlatform();
+  const shell = platform.shell || process.env.SHELL || "/bin/zsh";
+  const claudeCmd = (launcher.panes ?? [])[0]?.cmd || "claude";
+
+  // Launch Ghostty (or other terminal) directly with claude, no tmux
+  if (process.platform === "darwin") {
+    const args = ["-na", "Ghostty.app", "--args",
+      `--command=${shell} -c "cd '${envPath}' && ${claudeCmd}; exec ${shell}"`,
+      `--background=${colorDef.bg ?? "#0a0a0b"}`,
+      `--title=${title}`,
+      `--window-decoration=true`,
+      `--window-save-state=never`,
+      `--confirm-close-surface=false`,
+      `--keybind=super+n=new_window`,
+    ];
+    if (launcher.fullscreen) {
+      args.push(`--fullscreen=true`, `--macos-non-native-fullscreen=true`);
+    }
+    const child = spawn("open", args, { stdio: "ignore", detached: true });
+    child.unref();
+    terminalPids[key] = child.pid;
+    child.on("exit", () => { delete terminalPids[key]; });
   }
 }
 
