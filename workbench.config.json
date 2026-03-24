@@ -4,12 +4,12 @@
   "multiplexer": "tmux",
   "launchers": [
     {
-      "id": "ghostty",
-      "label": "Ghostty",
+      "id": "iterm2",
+      "label": "iTerm",
       "icon": "terminal",
       "type": "mux-terminal",
-      "app": "/Applications/Ghostty.app/Contents/MacOS/ghostty",
-      "fullscreen": true,
+      "app": "/Applications/iTerm.app",
+      "fullscreen": false,
       "panes": [
         { "cmd": "claude", "focus": true },
         { "cmd": null }
